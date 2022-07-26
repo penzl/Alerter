@@ -1,0 +1,94 @@
+{
+  "BTC-USD":
+        [["BTCUSDT","crypto","binance",[0.03,0.04, 6,6]],
+          ["Long Exp Resistance", "Exp", "2016-02-01", 358, "2020-09-21", 10620, "AllRange", "Alert_Below","pink"]
+        ],
+    "ETH-USD":
+        [["ETHUSDT","crypto","binance",[0.03,0.04, 7,7]],
+          ["Upper Channel", "Lin", "2021-11-28", 4863, "2022-02-11", 2816, ["2021-11-01","2022-03-01"], "Alert_Below", "violet"],
+          ["Lower Channel", "Lin", "2021-11-18", 4412, "2022-02-01", 2385, ["2021-11-01","2022-03-01"], "Alert_Below", "violet"]
+        ],
+    "ADA-USD":
+        [["ADAUSDT","crypto","binance"]
+        ],
+    "DOT-EUR":
+        [["DOTUSDT","crypto","binance"]
+        ],
+    "FTM-USD":
+        [["FTMUSDT","crypto","binance"],
+         ["ShortTerm resist", "Lin", "2021-09-11", 0.92, "2022-05-09", 1.85,  ["2021-09-11","2022-05-09"], "Alert_Below", "pink"]
+        ],
+    "LINK-USD":
+        [["ATOMUSDT","crypto","binance"],
+         ["14USD", "Lin", "2021-11-28", 14, "2022-02-11", 14,  "AllRange", "Alert_Below", "pink"]
+        ],
+    "AUDIO-USD":
+        [["ATOMUSDT","crypto","binance"]
+        ],
+    "ATOM-USD":
+        [["ATOMUSDT","crypto","binance"],
+         ["Log Channel Below", "Exp", "2020-02-17", 1.51, "2022-06-06", 40.31, "AllRange", "Alert_Below","pink"]
+        ],
+    "LUNA1-USD":
+        [["LUNAUSDT","crypto","binance"],
+         ["Channel Above", "Lin", "2021-04-14", 9.54, "2022-02-10", 69.88,  ["2021-09-11","2022-05-09"], "Alert_Above", "pink"],
+         ["Channel Below", "Lin", "2021-05-15", 5.39, "2022-02-16", 62.41,  ["2021-09-11","2022-05-09"], "Alert_Below", "pink"]
+        ],
+    "SOL-USD":
+        [["SOLUSDT","crypto","binance"],
+         ["Resistance", "Lin", "2021-04-14", 80, "2022-02-10", 80,  "AllRange", "Alert_Below", "pink"]
+        ],
+    "ONE1-USD":
+        [["ONEUSDT","crypto","binance"]
+        ],
+    "MATIC-USD":
+        [["MATICUSDT","crypto","binance"]
+        ],
+    "AVAX-USD":
+        [["AVAXUSDT","crypto","binance"]
+        ],
+    "XNO-USD":
+        [["ONEUSDT","crypto","binance"]
+        ],
+    "DFI-USD":
+        [["DFIUSDT","crypto","kucoin"],
+         ["Res 3USD", "Lin", "2021-11-28", 3, "2022-02-11", 3,  "AllRange", "Alert_Below", "pink"]
+        ],
+    "SCRT-USD":
+        [["SCRTUSDT","crypto","kucoin"]
+        ],
+    "GMT3-USD":
+        [["GMTUSDT","crypto","kucoin"]
+        ],
+    "TSLA":
+      [["TSLA","america","NASDAQ"],
+        ["Resist", "Lin", "2019-11-22", 33.73, "2022-10-18", 1054.21,  ["2019-11-22","2022-10-18"], "Alert_Below", "pink"],
+        ["HorizRes", "Lin", "2019-11-22", 790, "2022-10-18", 790,  ["2019-11-22","2022-10-18"], "Alert_Below", "pink"]
+      ],
+    "MSFT":
+      [["MSFT","america","NASDAQ"],
+        ["Long Exp Resistance", "Exp", "2017-05-01", 64.01, "2022-05-31", 330.75, "AllRange", "Alert_Below","pink"]
+      ],
+    "PLTR":
+       [["PLTR","america","NASDAQ"]
+        ],
+    "AMZN":
+       [["AMZN","america","NASDAQ"],
+            ["2800USD", "Lin", "2021-11-28", 2800, "2022-02-11", 2800,  "AllRange", "Alert_Below", "pink"]
+        ],
+    "GOOG":
+       [["GOOG","america","NASDAQ"],
+          ["Long Exp Resistance", "Exp", "2008-12-15", 164, "2022-12-27", 2007, "AllRange", "Alert_Below","pink"]
+        ],
+    "INTC":
+       [["INTC","america","NASDAQ"],
+          ["47USD line", "Lin", "2020-12-24", 47, "2022-04-01", 47, "AllRange", "Alert_Below","pink"]
+        ],
+    "NVDA":
+       [["NVDA","america","NASDAQ"],
+          ["229 Buyzone", "Lin", "2020-12-24", 229, "2022-04-01", 229, "AllRange", "Alert_Below","pink"]
+        ],
+    "AAPL":
+       [["NVDA","america","NASDAQ"]
+        ]
+}
