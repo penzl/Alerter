@@ -2,7 +2,6 @@ from AlerterV1_helpers import *
 from AlerterV1_constants import *
 import time
 
-
 def run(test=False):
     if test:  # TESTMODE
         BOT = BotStarter(TELEPOT_BOT_TEST, CHAT_ID_TEST,
@@ -26,6 +25,5 @@ def run(test=False):
 
 
 if __name__ == '__main__':
-#    run(test=True)
+    #    run(test=True)
     run()
-

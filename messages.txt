@@ -1,0 +1,91 @@
+
+
+🔹BTC:   -5.7%🔻 (week: 9.8%🌲)
+
+🔹ETH:   -7.3%🔻 (week: 4.3%🌲)
+
+🔹ADA:   -6.5%🔻 (week: 2.2%🌲)
+		▫️In Accum. Zone:  Price: 0.877 is between 0.72 and 0.96 (or below), Age: 13h, 2min
+
+🔹DOT-EUR:   -6.1%🔻 (week: 0.5%🌲)
+		▫️In Accum. Zone:  Price: 15.7 is between 13.2 and 17.5 (or below), Age: 13h, 2min
+
+🔹FTM:   -9.3%🔻 (week: 14.6%🌲)
+
+🔹LINK:   -6.2%🔻 (week: 5.1%🌲)
+		▫️Closing to (<2%) 14USD📈: Price: 14.4, Trend Price: 14 (Not Active), Age: 6h, 47min
+		▫️In Accum. Zone:  Price: 14.4 is between 11.3 and 15.1 (or below), Age: 13h, 2min
+
+🔹AUDIO:   -5.5%🔻 (week: 6.0%🌲)
+		▫️In Accum. Zone:  Price: 0.778 is between 0.805 and 1.07 (or below), Age: 13h, 2min
+
+🔹ATOM:   5.5%🌲 (week: 27.1%🌲)
+
+🔹LUNA:   -0.2%🔻 (week: 26.6%🌲)
+		▫️Crossed -> Channel Above📈: Price: 92, Trend Price: 74.4, Age: 13h, 2min
+
+🔹SOL:   -8.5%🔻 (week: 7.7%🌲)
+		▫️In Accum. Zone:  Price: 92.1 is between 80 and 107 (or below), Age: 13h, 2min
+
+🔹ONE:   -8.5%🔻 (week: 6.8%🌲)
+		▫️In Accum. Zone:  Price: 0.15 is between 0.119 and 0.159 (or below), Age: 13h, 2min
+
+🔹MATIC:   -5.8%🔻 (week: 6.0%🌲)
+
+🔹AVAX:   -6.3%🔻 (week: 4.1%🌲)
+
+🔹XNO:   -0.8%🔻 (week: 6.5%🌲)
+		▫️In Accum. Zone:  Price: 1.86 is between 1.85 and 2.47 (or below), Age: 13h, 2min
+
+🔹DFI:   -2.4%🔻 (week: 6.8%🌲)
+
+🔹SCRT:   -5.9%🔻 (week: -4.7%🔻)
+
+🔹TSLA:   -4.6%🔻 (week: 3.6%🌲)
+		▫️Closing to (<2%) Resist📈: Price: 839, Trend Price: 835, Age: 12h, 59min
+
+🔹MSFT:   -1.4%🔻 (week: -0.5%🔻)
+		▫️Crossed -> Long Exp Resistance📈: Price: 296, Trend Price: 306, Age: 13h, 2min
+
+🔹PLTR:   -6.0%🔻 (week: -1.1%🔻)
+		▫️Selloff:  1W, Price: 11.34, RSI = 23.8, Age: 13h, 2min
+		▫️In Accum. Zone:  Price: 11.3 is between 9 and 12 (or below), Age: 13h, 2min
+
+🔹AMZN:   -2.7%🔻 (week: -3.8%🔻)
+
+🔹GOOG:   -0.3%🔻 (week: -0.2%🔻)
+
+🔹INTC:   -1.9%🔻 (week: 0.5%🌲)
+		▫️Closing to (<2%) 47USD line📈: Price: 47.9, Trend Price: 47, Age: 12h, 38min
+
+🔹NVDA:   -2.1%🔻 (week: -1.8%🔻)
+
+🔹AAPL:   -0.2%🔻 (week: 0.8%🌲)
+		▫️BullDCA:  Price: 166.23, 1w_RSI = 55.4, 1d_RSI = 47.4, 1d_Stoch.K: 66.7, 1d_Stoch.D: 58, Age: 13h, 2min
+
+Combined alerts:
+
+🔹Sellof (RSI<30):
+			▫️PLTR
+
+🔹BullDCA:
+			▫️AAPL
+
+🔹Close to trend:
+			▫️LINK
+			▫️TSLA
+			▫️INTC
+
+🔹Crossed trend:
+			▫️LUNA
+			▫️MSFT
+
+🔹In Accum. Zone:
+			▫️ADA
+			▫️DOT-EUR
+			▫️LINK
+			▫️AUDIO
+			▫️SOL
+			▫️ONE
+			▫️XNO
+			▫️PLTR
