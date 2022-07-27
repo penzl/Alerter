@@ -1,0 +1,1392 @@
+<!DOCTYPE HTML>
+<html>
+<style>
+    body {
+        background-color: #2a2a2a;
+    }
+    
+    .float-child {
+        width: 40%;
+        float: left;
+    }
+    
+    #lvlbtn {
+        z-index: 1;
+        position: absolute;
+        top: 15px;
+        left: 70px;
+    }
+    
+    #container {
+        position: relative;
+    }
+    
+    #chartContainer1 {
+        z-index: 2;
+    }
+    
+    #buttonForm {
+        text-align: center;
+    }
+    
+    .buttonLvlSh {
+        background-color: #ff0000;
+        color: #ffffff;
+        font-size: 12px;
+        padding: 5px 5px;
+        border-radius: 5px;
+        border: 0px;
+    }
+    
+    .buttonLvlLn {
+        background-color: #001aff;
+        color: #ffffff;
+        font-size: 12px;
+        padding: 5px 5px;
+        border-radius: 5px;
+        border: 0px;
+    }
+    .buttonResist {
+        background-color: #797979;
+        color: #ffffff;
+        font-size: 12px;
+        padding: 5px 5px;
+        border-radius: 5px;
+        border: 0px;
+    }
+    .toolButton {
+        background-color: #b1ff83;
+        color: #000000;
+        font-size: 12px;
+        padding: 5px 5px;
+        border-radius: 5px;
+        border: 0px;
+    }
+    
+    ;
+    input {
+        padding: 10px;
+        font-size: 12px;
+        font-family: Raleway;
+        border: 1px solid #aaaaaa;
+    }
+    
+    ;
+    .row:after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+    
+    .colL {
+        float: left;
+        width: 69%;
+        height: 270px;
+    }
+    
+    .colR {
+        position:relative;
+        float: left;
+        width: 30%;
+        height: 400px;
+        display: block
+    }
+
+    .rot {
+        position:absolute;
+        -webkit-transform: rotate(90deg);
+        -webkit-transform-origin: 0 0;
+        margin-left: 100%;
+        border: 1px solid red;
+    }
+
+    #chartContainer2 {
+        display: inline-block;
+        width: 400px;
+        height: 200px;
+        position:absolute;
+    }
+
+</style>
+
+<body>
+    <header>
+        <div style="width: 100%;">
+            <form id="buttonForm" method="post" action="/">
+                <div id="Buttons"></div>
+            </form>
+        </div>
+    </header>
+    <section>
+        <!-- Just so that JSFiddle's Result label doesn't overlap the Chart -->
+        <div class="range-title-container" , style="height:10px">
+            <div class="float-child">
+                <button class="button" id="TwoYear">2y</button>
+                <button class="button" id="OneYear">1y</button>
+                <button class="button" id="SixMonths">6m</button>
+                <button class="button" id="ThreeMonths">3m</button>
+                <button class="button" id="All">All</button>
+            </div>
+            <div class="float-child">
+                <p id="tickerDiv" style="font-size:20px; color:white"></p>
+            </div>
+        </div>
+        </div>
+        <br/>
+        <div id="container">
+            <div class="row">
+                <div class="colL" id="chartContainer1" style="height: 400px"></div>
+                <div class="colR" style="height: 400px">
+                    <div class="rot">
+                        <div id="chartContainer2" class="rotated"></div>   
+                    </div>             
+                </div>
+            </div>
+            <div class="row">
+                <div class="colL" id="chartContainer3" style="height: 100px"></div>
+            </div>
+            <div class="row">
+                <div class="colL" id="chartContainer4" style="height: 100px"></div>
+            </div>
+            <div class="row">
+                <div class="colL" id="chartContainer5" style="height: 100px"></div>
+            </div>
+            <div id="lvlbtn">
+                <form action="">
+                    <input type="button" id="LevelsBtnSh" value="Short" class="buttonLvlSh" onclick="toggle(this);">
+                    <input type="button" id="LevelsBtnLn" value="Long" class="buttonLvlLn" onclick="toggle(this);">
+                    <input type="button" id="ResistBtn" value="Resist." class="buttonResist">
+                    <input type="button" id="EMATrend" value="EMA Trend" class="toolButton" style="background-color: orchid; opacity:0.5">
+                    <input type="button" id="BuySellZone" value="Buy/Sell Zones" class="toolButton" style="background-color: rgb(145, 12, 140); color: white">
+                    <input type="button" id="yZoomIn" value="Y Zoom IN" class="toolButton" >
+                    <input type="button" id="yZoomOut" value="Y Zoom Out" class="toolButton">
+                </form>
+            </div>
+        </div>
+
+    </section>
+    <footer>
+        <div style="width:500px" id="d2">
+            <img width="200" src="https://alternative.me/crypto/fear-and-greed-index.png" alt="Latest Crypto Fear & Greed Index" />
+            <pre id="AlertsDiv" style="color:white;font-size:12px">Current Alerts: </pre>
+
+            <script type="text/javascript" src="https://canvasjs.com/assets/script/jquery-1.11.1.min.js"></script>
+            <script src="http://code.jquery.com/ui/1.11.0/jquery-ui.js"></script>
+
+            <script src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
+        </div>
+    </footer>
+</body>
+
+<head>
+    <script>
+        Array.prototype.max = function() {
+            return Math.max.apply(null, this);
+        };
+
+        Array.prototype.min = function() {
+            return Math.min.apply(null, this);
+        };
+
+        var container = document.getElementById('container');
+        container.style.width = "auto";
+        var window_width = window.innerWidth;
+
+        document.addEventListener("DOMContentLoaded", function(event) {
+            var doc = document;
+            var docFrag = document.createDocumentFragment();
+            var buttonsLabels = {{ tickers| tojson}}.tickers;
+            for (var x = 0; x < buttonsLabels.length; x++) {
+                console.log(buttonsLabels[x])
+                var button = doc.createElement('input');
+                button.type = 'submit';
+                button.value = buttonsLabels[x];
+                button.name = buttonsLabels[x];
+                docFrag.appendChild(button);
+            }
+
+            doc.getElementById('Buttons').appendChild(docFrag);
+        });
+
+        window.onload = function() {
+            var charts = [];
+            var toolTip = {
+                    enabled: true,
+                    shared: false,
+                    fontSize: 11,
+                },
+                legend = {
+                    verticalAlign: "top",
+                    horizontalAlign: "left",
+                    dockInsidePlotArea: true,
+                    cursor: "pointer",
+                    fontSize: 10,
+                    itemclick: function(e) {
+                        if (typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+                            e.dataSeries.visible = false;
+                        } else {
+                            e.dataSeries.visible = true;
+                        }
+                        e.chart.render();
+                    }
+                };
+
+            var ticker = null,
+                buttonsLabels = [],
+                areaBlock = [],
+                areaBlockVolProf = [],
+                Candles = [],
+                VolProf = [],
+                VolProf_x = [],
+                VolProf_y = [],
+                VolProf_stat = [],
+                ShProf_stat = [],
+                resistances = [],
+                Volume = [],
+                RSI = [],
+                Stoch = [],
+                Stoch_sig = [],
+                BB = [],
+                RSI_w = [],
+                MA21 = [],
+                EMATrend_down = [],
+                EMATrend_up = [],
+                MA21_envelope = [],
+                MA21_envelope2 = [],
+                BB_w = [],
+                EMA21 = [],
+                MA50 = [],
+                MA200 = [],
+                count_levels = 0;
+
+            var chartPrice = new CanvasJS.Chart("chartContainer1", {
+                animationEnabled: true,
+                exportEnabled: true,
+                zoomEnabled: true,
+                zoomType: "xy",
+                theme: "dark1", // "light1", "light2", "dark1", "dark2"
+                toolTip: toolTip,
+                axisY: {
+                    labelFontSize: 11,
+                    valueFormatString: "",
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: ""
+                    },
+                    gridThickness: 0.1,
+                    stripLines: [{
+                        value: null,
+                        labelPlacement: "outside",
+                        lineThickness: 1,
+                        color: "white",
+                        lineDashType: "dot",
+                        labelFontColor: "white",
+                        labelBackgroundColor: "#666666"
+                    }, ]
+                },
+                axisX: {
+                    labelFontSize: 11,
+
+                    labelFormatter: function(e) {
+                        return "";
+                    },
+
+                    tickLength: 0,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: "DD MMM YY"
+                    }
+                },
+                legend: legend,
+                data: [{
+                    click: onClickCandles,
+                    type: "candlestick",
+                    risingColor: "#26a69a",
+                    fallingColor: "#ef5350",
+                    showInLegend: false,
+                    name: "Price",
+                    yValueFormatString: "0.00#",
+                    color: "#64b5f6",
+                    xValueType: "dateTime",
+                    xValueFormatString: "DD MMM YY HH:mm",
+                    highlightEnabled: false,
+                    dataPoints: Candles
+                }, {
+                    type: "line",
+                    showInLegend: false,
+                    name: "Area",
+                    toolTipContent: null,
+                    yValueFormatString: "",
+                    color: "transparent",
+                    xValueType: "dateTime",
+                    xValueFormatString: "DD MMM YY HH:mm",
+                    //legendMarkerType: "square",
+                    dataPoints: areaBlock,
+                    highlightEnabled: false,
+
+                }]
+            })
+            var volProfChartOptions = {
+                animationEnabled: true,
+                theme: "dark1",
+                title: {},
+                height: innerWidth * 0.3,
+                axisX: {
+                    gridThickness: 0.1,
+                    labelAngle: 0,
+                    reversed:  true,
+                    labelFontSize: 10,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: ""
+                    },
+                    stripLines: [{
+                        value: null,
+                        labelPlacement: "outside",
+                        lineThickness: 1,
+                        color: "white",
+                        lineDashType: "dot",
+                        labelFontColor: "white",
+                        labelBackgroundColor: "#666666"
+                    }, ]
+                },
+                axisY: {
+                    labelFormatter: function(e) {
+                        return "";
+                    },
+                    labelFontSize: 11,
+                    valueFormatString: "0.00#e0",
+                    tickLength: 0,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: "0.00#e0"
+                    },
+                    gridThickness: 0.0,
+
+                },
+                toolTip: {
+                    enabled: false,
+                    shared: false,
+                    fontSize: 11,
+                },
+                legend: {
+                    verticalAlign: "top",
+                    horizontalAlign: "right",
+                    dockInsidePlotArea: true,
+                    cursor: "pointer",
+                    fontSize: 10,
+                    itemclick: function(e) {
+                        if (typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+                            e.dataSeries.visible = false;
+                        } else {
+                            e.dataSeries.visible = true;
+                        }
+                        e.chart.render();
+                    }
+                },
+                data: [     
+                {
+                    type: "column",
+                    showInLegend: true,
+                    name: "Volume per Price",
+                    color: "white",
+                    visible: false,
+                    legendMarkerType: "square",
+                    dataPoints: VolProf
+                },           
+                    {
+                    type: "line",
+                    showInLegend: true,
+                    fillOpacity: 1,
+                    name: "Volume per Price - Smooth",
+                    color: "red",
+                    legendMarkerType: "square",
+                    dataPoints: VolProf_stat
+                },
+                {
+                    type: "line",
+                    showInLegend: true,
+                    fillOpacity: 1,
+                    name: "Short Profile - Smooth",
+                    color: "orange",
+                    legendMarkerType: "square",
+                    dataPoints: ShProf_stat
+                },
+                {
+                    type: "line",
+                    showInLegend: false,
+                    name: "Area",
+                    toolTipContent: null,
+                    color: "transparent",
+                    //legendMarkerType: "square",
+                    dataPoints: areaBlockVolProf,
+                    highlightEnabled: false,
+                }
+            ]
+            }
+            var volumeChartOptions = {
+                animationEnabled: true,
+                theme: "dark1",
+                axisX: {
+                    labelFormatter: function(e) {
+                        return "";
+                    },
+                    tickLength: 0,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: "DD MMM YY"
+                    }
+                },
+                axisY: {
+                    title: "Volume",
+                    //margin: 50,
+                    //labelMaxWidth: 50,
+                    valueFormatString: "0.00#e0",
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: "0.00#e0"
+                    },
+                    gridThickness: 0.1,
+                },
+                toolTip: {
+                    enabled: true,
+                    shared: true,
+                    fontSize: 11,
+                    content: "{x}, Vol: {y}",
+                },
+                legend: legend,
+                data: [{
+                    type: "column",
+                    showInLegend: false,
+                    dataPointMaxWidth: 200,
+                    name: "Outbound",
+                    color: "#81c784",
+                    xValueType: "dateTime",
+                    yValueFormatString: "0.00#e0",
+                    legendMarkerType: "square",
+                    dataPoints: Volume
+                }]
+            }
+            var rsiChartOptions = {
+                animationEnabled: true,
+                theme: "dark1",
+                axisX: {
+                    labelFormatter: function(e) {
+                        return "";
+                    },
+                    tickLength: 0,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: "DD MMM YY"
+                    }
+                },
+                axisY: {
+                    maximum: 80,
+                    minimum: 20,
+                    interval: 20,
+                    title: "RSI",
+                    //margin: 50,
+                    //labelMaxWidth: 50,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: ""
+                    },
+                    gridThickness: 0.1,
+                    stripLines: [{
+                        startValue: 30,
+                        endValue: 70,
+                        color: "green",
+                        opacity: .1,
+                    }, {
+                        value: 30,
+                        color: "white",
+                        opacity: .5,
+                        lineDashType: "dash",
+                    }, {
+                        value: 70,
+                        color: "white",
+                        opacity: .5,
+                        lineDashType: "dash",
+                    }, ]
+                },
+                toolTip: {
+                    enabled: true,
+                    shared: true,
+                    fontSize: 11,
+                },
+                legend: legend,
+                data: [{
+                    type: "line",
+                    showInLegend: true,
+                    name: "RSI",
+                    xValueType: "dateTime",
+                    yValueFormatString: "0.0#",
+                    toolTipContent: "{x}, RSI: {y}",
+                    legendMarkerType: "square",
+                    dataPoints: RSI
+                }, {
+                    type: "line",
+                    showInLegend: true,
+                    name: "RSI_w",
+                    xValueType: "dateTime",
+                    yValueFormatString: "0.0#",
+                    toolTipContent: "{x}, wRSI: {y}",
+                    legendMarkerType: "square",
+                    dataPoints: RSI_w
+                }, ]
+            }
+            var stochChartOptions = {
+                animationEnabled: true,
+                theme: "dark1",
+                axisX: {
+                    tickLength: 0,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: "DD MMM YY"
+                    }
+                },
+                axisY: {
+                    title: "Stoch",
+                    //margin: 50,
+                    //labelMaxWidth: 50,
+                    crosshair: {
+                        enabled: true,
+                        snapToDataPoint: false,
+                        valueFormatString: ""
+                    },
+                    gridThickness: 0.1,
+                    stripLines: [{
+                        startValue: 20,
+                        endValue: 80,
+                        color: "green",
+                        opacity: .1,
+                    }, {
+                        value: 20,
+                        color: "white",
+                        opacity: .5,
+                        lineDashType: "dash",
+                    }, {
+                        value: 80,
+                        color: "white",
+                        opacity: .5,
+                        lineDashType: "dash",
+                    }, ]
+                },
+                toolTip: {
+                    enabled: true,
+                    shared: true,
+                    fontSize: 11,
+                },
+                legend: legend,
+                data: [{
+                    showInLegend: true,
+                    yValueFormatString: "0.0#",
+                    type: "line",
+                    toolTipContent: "{x}, Stoch: {y}",
+
+                    highlightEnabled: true,
+                    name: "Stoch",
+                    dataPoints: Stoch
+                }, {
+                    showInLegend: true,
+                    highlightEnabled: true,
+                    yValueFormatString: "0.0#",
+                    toolTipContent: "{x}, Stoch.sig: {y}",
+                    type: "line",
+                    name: "Stoch_sig",
+                    dataPoints: Stoch_sig
+                }]
+            }
+
+            charts.push(chartPrice);
+            charts.push(new CanvasJS.Chart("chartContainer2", volProfChartOptions));
+            charts.push(new CanvasJS.Chart("chartContainer3", volumeChartOptions));
+            charts.push(new CanvasJS.Chart("chartContainer4", rsiChartOptions));
+            charts.push(new CanvasJS.Chart("chartContainer5", stochChartOptions));
+
+            //$.getJSON("json_data.json", function(json_str) {
+                //var json = JSON.parse(json_str.replace(/\bNaN\b/g, "null"));
+                var json = {{ dta | tojson}}
+                console.log(json.name); // this will show the info it in firebug console
+                console.log("hello")
+                ticker = json.name;
+                // daily candles
+                for (var i = 0; i < json.x_daily.length; i++) {
+                    Candles.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: json.y_daily[i].slice(0, 4),
+                        color: json.y_daily[i][0] < json.y_daily[i][3] ? "#26a69a" : "#ef5350"
+                    });
+                    areaBlock.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: json.y_daily[i][3] * 1.3,
+                    });
+                    areaBlock.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: json.y_daily[i][3] * 0.7,
+                    });
+                    areaBlockVolProf.push({
+                        x: json.y_daily[i][3] * 0.7,
+                        y: 0,
+                    });
+                    areaBlockVolProf.push({
+                        x: json.y_daily[i][3] * 1.3,
+                        y: 0,
+                    });
+                    Volume.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: json.y_daily[i][4],
+                        color: json.y_daily[i][0] < json.y_daily[i][3] ? "#26a69a" : "#ef5350"
+                    });
+                    RSI.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: json.y_daily[i][5]
+                    });
+                    Stoch.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: json.y_daily[i][8]
+                    });
+                    Stoch_sig.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: json.y_daily[i][9]
+                    });
+                    BB.push({
+                        x: new Date(json.x_daily[i] / 1000000),
+                        y: [json.y_daily[i][11], json.y_daily[i][10]]
+                    });
+                    EMATrend_down.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: json.y_daily[i][12]<json.y_daily[i][13] ? [json.y_daily[i][12],json.y_daily[i][13]] : [null,null]
+                    });
+                    EMATrend_up.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: json.y_daily[i][12]>json.y_daily[i][13] ? [json.y_daily[i][12],json.y_daily[i][13]] : [null,null]
+                    });
+                };
+                // weekly candles
+                for (var i = 0; i < json.x.length; i++) {
+                    RSI_w.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: json.RSI_w[i]
+                    });
+                    MA21.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: json.MA21[i]
+                    });
+                    MA21_envelope.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: [json.MA21[i] / 2, json.MA21[i] / 1.5]
+                    });
+                    MA21_envelope2.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: [json.MA21[i] * 1.5, json.MA21[i] * 2]
+                    });
+                    BB_w.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: [json.BB_low_w[i], json.BB_high_w[i]]
+                    });
+                    EMA21.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: json.EMA21[i]
+                    });
+                    MA50.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: json.MA50[i]
+                    });
+                    MA200.push({
+                        x: new Date(json.x[i] / 1000000),
+                        y: json.MA200[i]
+                    });
+                }
+
+                // volume profile
+                for (var i = 0; i < json.xVolProf.length; i++) {
+                    VolProf.push({
+                        x: json.xVolProf[i],
+                        y: json.yVolProf[i],
+                    });
+                    VolProf_x.push(json.yVolProf[i])
+                }
+                for (var i = 0; i < json.xVolProfStat.length; i++) {
+                    VolProf_stat.push({
+                        x: json.xVolProfStat[i],
+                        y: json.yVolProfStat[i],
+                    });
+                };
+                for (var i = 0; i < json.xShProfStat.length; i++) {
+                    ShProf_stat.push({
+                        x: json.xShProfStat[i],
+                        y: json.yShProfStat[i],
+                    });
+                };
+/*                 for (var i = 0; i < json.resistances.length; i++) {
+                    resistances.push(xShProfStat[i]);
+                }; */
+                resistances = json.resistances
+                console.log(resistances)
+
+
+                // add technicals to plot
+                var nms = ["MA21", "EMA21", "MA50", "MA200"];
+                var data = [MA21, EMA21, MA50, MA200];
+                var shw = [true, false, false, false];
+                var tech_colors = ["orange", "#34cceb", "#34ebb4", "#5934eb"];
+                for (var i = 0; i < nms.length; i++) {
+                    charts[0].options.data.push({
+                        name: nms[i],
+                        yValueFormatString: "#,###.##",
+                        visible: shw[i],
+                        type: "line",
+                        color: tech_colors[i],
+                        lineThickness: 1,
+                        dataPoints: data[i],
+                        highlightEnabled: true,
+                        showInLegend: true,
+                    });
+                }
+                charts[0].options.data.push({
+                    name: "Acc.zone",
+                    yValueFormatString: "#,###.##",
+                    visible: true,
+                    type: "rangeArea",
+                    dataPoints: MA21_envelope,
+                    lineDashType: "solid",
+                    fillOpacity: .05,
+                    color: "green",
+                    toolTipContent: null,
+                    lineThickness: 0.2,
+                    highlightEnabled: false,
+                    showInLegend: false,
+                });
+                charts[0].options.data.push({
+                    name: "Diss.Zone",
+                    yValueFormatString: "#,###.##",
+                    visible: true,
+                    type: "rangeArea",
+                    dataPoints: MA21_envelope2,
+                    lineDashType: "solid",
+                    fillOpacity: .05,
+                    color: "red",
+                    toolTipContent: null,
+                    lineThickness: 0.2,
+                    highlightEnabled: false,
+                    showInLegend: false,
+                });
+                charts[0].options.data.push({
+                    name: "BB",
+                    yValueFormatString: "#,###.##",
+                    visible: false,
+                    type: "rangeArea",
+                    dataPoints: BB,
+                    fillOpacity: .01,
+                    color: "violet",
+                    toolTipContent: null,
+                    lineThickness: 1,
+                    highlightEnabled: false,
+                    showInLegend: true,
+                });
+                charts[0].options.data.push({
+                    name: "BBw",
+                    yValueFormatString: "#,###.##",
+                    visible: false,
+                    type: "rangeArea",
+                    dataPoints: BB_w,
+                    fillOpacity: .01,
+                    color: "red",
+                    toolTipContent: null,
+                    lineThickness: 1,
+                    highlightEnabled: false,
+                    showInLegend: true,
+                });
+                charts[0].options.data.push({
+                    name: "EMAtrend_down",
+                    yValueFormatString: "#,###.##",
+                    visible: false,
+                    type: "rangeArea",
+                    color: "red",
+                    dataPoints: EMATrend_down,
+                    fillOpacity: .4,
+                    toolTipContent: null,
+                    lineThickness: 0,
+                    highlightEnabled: false,
+                    showInLegend: false,
+                });
+                charts[0].options.data.push({
+                    name: "EMAtrend_up",
+                    yValueFormatString: "#,###.##",
+                    visible: false,
+                    type: "rangeArea",
+                    color: "blue",
+                    dataPoints: EMATrend_up,
+                    fillOpacity: .4,
+                    toolTipContent: null,
+                    lineThickness: 0.5,
+                    highlightEnabled: false,
+                    showInLegend: false,
+                });
+                var trends = json.trends
+                for (var k = 0; k < trends.length / 4; k++) {
+                    var trend0 = []
+                    for (var j = 0; j < trends[k * 4].length; j++) {
+                        trend0.push({
+                            x: new Date(trends[k * 4][j] / 1000000),
+                            y: trends[k * 4 + 1][j],
+                            color: trends[k * 4 + 3]
+                        })
+                    }
+                    charts[0].options.data.push({
+                        name: "Trend: " + trends[k * 4 + 2],
+                        yValueFormatString: "#,###.##",
+                        lineColor: trends[k * 4 + 3],
+                        color: trends[k * 4 + 3],
+                        lineDashType: "dash",
+                        lineThickness: 1.5,
+                        type: "line",
+                        dataPoints: trend0,
+                        highlightEnabled: false,
+                        showInLegend: true,
+                        //toolTipContent: null,
+                    })
+                }
+
+
+                var nms = ["Selloff", "BullDCA", "BearDCA", "Cashout", "SellDCA"];
+                var data_x = [json.x_Selloff, json.x_BullDCA, json.x_BearDCA, json.x_Cashout, json.x_SellDCA];
+                var data_y = [json.y_Selloff, json.y_BullDCA, json.y_BearDCA, json.y_Cashout, json.y_SellDCA];
+                for (var k = 0; k < nms.length; k++) {
+                    var strat0 = [];
+                    for (var i = 0; i < data_x[k].length; i++) {
+                        strat0.push({
+                            x: new Date(data_x[k][i] / 1000000),
+                            y: data_y[k][i]
+                        });
+                    };
+                    charts[0].options.data.push({
+                        name: "Strategy: " + nms[k],
+                        yValueFormatString: "#,###.##",
+                        type: "scatter",
+                        dataPoints: strat0,
+                        highlightEnabled: false,
+                        showInLegend: true,
+                        toolTipContent: null,
+                        visible: false,
+                    });
+                };
+
+
+                // Create a ghost area for better visibility
+                areaBlock.push({
+                    x: new Date(json.x_daily[json.x_daily.length - 1] / 1000000 + (100 * 24 * 60 * 60 * 1000)),
+                    y: json.y_daily[json.x_daily.length - 1][3] * 1.3,
+                });
+                areaBlock.push({
+                    x: new Date(json.x_daily[json.x_daily.length - 1] / 1000000 + (100 * 24 * 60 * 60 * 1000)),
+                    y: json.y_daily[json.x_daily.length - 1][3] * 0.7,
+                });
+
+                // Alert list string at the bottom
+                var alert_string = json.alerts;
+                var div = document.getElementById("AlertsDiv");
+                div.innerHTML += alert_string;
+
+                // sync crosshairs
+                syncCharts(charts, false, true, true); // syncCharts(charts, syncToolTip, syncCrosshair, syncAxisXRange)
+
+                // Set stripline for last price
+                var last_price = json.y_daily[json.y_daily.length - 1][3]
+
+                charts[0].options.axisY.stripLines[0].value = last_price
+                charts[0].options.axisY.stripLines[0].label = CanvasJS.formatNumber(last_price)
+                charts[1].options.axisX.stripLines[0].value = last_price
+                charts[1].options.axisX.stripLines[0].label = CanvasJS.formatNumber(last_price)
+
+
+                for (var i = 0; i < charts.length; i++) {
+                    charts[i].render();
+                }
+
+
+                // set margins correctly
+                //charts[0].title.set("text", json.name)
+                for (var i = 2; i < charts.length; i++) {
+                    charts[i].axisY[0].set("margin", charts[0].axisY[0].bounds.x2 - (charts[2].axisY[0].bounds.x2 - charts[2].axisY[0].bounds.x1));
+                }
+                document.getElementById("tickerDiv").innerHTML = ticker;
+
+                // set to 1y view
+                var lastDate = new Date(Candles[Candles.length - 1].x)
+                lastDate.setDate(lastDate.getDate() - 12 * 31)
+                charts[0].axisX[0].set("viewportMinimum", lastDate, false);
+                charts[0].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                charts[0].axisY[0].set("viewportMinimum", charts[0].axisY[0].get("viewportMinimum") * 1.2, false);
+                charts[0].axisY[0].set("viewportMaximum", charts[0].axisY[0].get("viewportMaximum") * 0.8, false);
+
+                for (var i = 2; i < charts.length; i++) {
+                    charts[i].axisX[0].set("viewportMinimum", lastDate, false);
+                    charts[i].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                    charts[i].axisY[0].set("margin", charts[0].axisY[0].bounds.x2 - (charts[i].axisY[0].bounds.x2 - charts[i].axisY[0].bounds.x1));
+                }
+                charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].viewportMinimum);
+                charts[1].axisX[0].set("viewportMaximum", charts[0].axisY[0].viewportMaximum);
+
+                // volume profile
+
+
+            //});
+
+            function syncCharts(charts, syncToolTip, syncCrosshair, syncAxisXRange) {
+
+                if (!this.onCrosshairXUpdated) {
+                    this.onCrosshairXUpdated = function(e) {
+                        for (var j = 0; j < charts.length; j++) {
+                            if (charts[j] != e.chart && j != 1 && e.chart != charts[1]) {
+                                charts[j].axisX[0].crosshair.showAt(e.value)
+                                charts[j].axisY[0].crosshair.hide()
+
+                            }
+                            if (charts[1] == e.chart && j == 0) {
+                                charts[j].axisY[0].crosshair.showAt(e.value)
+                                charts[j].axisX[0].crosshair.hide()
+                            }
+                        }
+                    }
+                }
+
+                if (!this.onCrosshairXHidden) {
+                    this.onCrosshairXHidden = function(e) {
+                        for (var j = 0; j < charts.length; j++) {
+                            if (charts[j] != e.chart) {
+                                if (j == 1)
+                                    charts[j].axisY[0].crosshair.hide()
+                                charts[j].axisX[0].crosshair.hide()
+                            }
+
+                        }
+                    }
+                }
+
+                if (!this.onCrosshairYUpdated) {
+                    this.onCrosshairYUpdated = function(e) {
+                        for (var j = 0; j < charts.length; j++) {
+                            if (charts[j] != e.chart) {
+                                if (j == 1)
+                                    charts[j].axisX[0].crosshair.showAt(e.value)
+                            }
+                        }
+                    }
+                }
+
+                if (!this.onCrosshairYHidden) {
+                    this.onCrosshairYHidden = function(e) {
+                        for (var j = 0; j < charts.length; j++) {
+                            if (j == 1)
+                                charts[j].axisX[0].crosshair.hide()
+                            charts[j].axisY[0].crosshair.hide()
+                        }
+                    }
+                }
+
+                if (!this.onRangeChanged) {
+                    this.onRangeChanged = function(e) {
+                        for (var j = 0; j < charts.length; j++) {
+                            if (e.trigger === "reset") {
+                                charts[j].options.axisX.viewportMinimum = charts[j].options.axisX.viewportMaximum = null;
+                                charts[j].options.axisY.viewportMinimum = charts[j].options.axisY.viewportMaximum = null;
+                                charts[j].render();
+                            } else if (charts[j] !== e.chart) {
+                                if (j == 1) {
+                                    var i_start, i_end;
+                                    for (var i = 0; i < VolProf.length; i++) {
+                                        if (VolProf[i].x > charts[0].options.axisY.viewportMinimum) {
+                                            i_start = i;
+                                            break
+                                        }
+                                    }
+                                    for (var i = 0; i < VolProf.length; i++) {
+                                        if (VolProf[VolProf.length - 1 - i].x < charts[0].options.axisY.viewportMaximum) {
+                                            i_end = VolProf.length - 1 - i;
+                                            break
+                                        }
+                                    }
+                                    console.log(VolProf_x.slice(i_start, i_end + 1).max())
+                                    charts[j].options.axisY.viewportMaximum = VolProf_x.slice(i_start, i_end + 1).max();
+                                    charts[j].options.axisX.viewportMinimum = e.axisY[0].viewportMinimum;
+                                    charts[j].options.axisX.viewportMaximum = e.axisY[0].viewportMaximum;
+                                    charts[j].render()
+
+                                } else {
+                                    charts[j].options.axisX.viewportMinimum = e.axisX[0].viewportMinimum;
+                                    charts[j].options.axisX.viewportMaximum = e.axisX[0].viewportMaximum;
+                                    charts[j].render()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for (var i = 0; i < charts.length; i++) {
+
+                    //Sync ToolTip
+                    //Sync Crosshair
+                    if (syncCrosshair) {
+                        if (!charts[i].options.axisY)
+                            charts[i].options.axisY["crosshair"] = {
+                                enabled: true
+                            };
+                        if (!charts[i].options.axisX)
+                            charts[i].options.axisX = {
+                                crosshair: {
+                                    enabled: true
+                                }
+                            };
+                        charts[i].options.axisX.crosshair.updated = this.onCrosshairXUpdated;
+                        charts[i].options.axisX.crosshair.hidden = this.onCrosshairXHidden;
+                        charts[i].options.axisY.crosshair.updated = this.onCrosshairYUpdated;
+                        charts[i].options.axisY.crosshair.hidden = this.onCrosshairYHidden;
+                    }
+
+                    //Sync Zoom / Pan
+                    if (syncAxisXRange) {
+                        charts[i].options.rangeChanged = this.onRangeChanged;
+                    }
+                }
+            }
+
+            document.getElementById("TwoYear").addEventListener("click", function() {
+                var lastDate = new Date(Candles[Candles.length - 1].x)
+                lastDate.setDate(lastDate.getDate() - 24 * 31)
+                charts[0].axisX[0].set("viewportMinimum", lastDate, false);
+                charts[0].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                for (var i = 2; i < charts.length; i++) {
+                    charts[i].axisX[0].set("viewportMinimum", lastDate, false);
+                    charts[i].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                    charts[i].axisY[0].set("margin", charts[0].axisY[0].bounds.x2 - (charts[i].axisY[0].bounds.x2 - charts[i].axisY[0].bounds.x1));
+                }
+                charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].viewportMinimum);
+                charts[1].axisx[0].set("viewportMaximum", charts[0].axisY[0].viewportMaximum);
+            });
+            document.getElementById("OneYear").addEventListener("click", function() {
+                var lastDate = new Date(Candles[Candles.length - 1].x)
+                lastDate.setDate(lastDate.getDate() - 12 * 31)
+                charts[0].axisX[0].set("viewportMinimum", lastDate, false);
+                charts[0].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                for (var i = 2; i < charts.length; i++) {
+                    charts[i].axisX[0].set("viewportMinimum", lastDate, false);
+                    charts[i].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                    charts[i].axisY[0].set("margin", charts[0].axisY[0].bounds.x2 - (charts[i].axisY[0].bounds.x2 - charts[i].axisY[0].bounds.x1));
+                }
+                charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].viewportMinimum);
+                charts[1].axisX[0].set("viewportMaximum", charts[0].axisY[0].viewportMaximum);
+
+
+            });
+            document.getElementById("SixMonths").addEventListener("click", function() {
+                var lastDate = new Date(Candles[Candles.length - 1].x)
+                lastDate.setDate(lastDate.getDate() - 6 * 31)
+                charts[0].axisX[0].set("viewportMinimum", lastDate, false);
+                charts[0].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                for (var i = 2; i < charts.length; i++) {
+                    charts[i].axisX[0].set("viewportMinimum", lastDate, false);
+                    charts[i].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                    charts[i].axisY[0].set("margin", charts[0].axisY[0].bounds.x2 - (charts[i].axisY[0].bounds.x2 - charts[i].axisY[0].bounds.x1));
+                }
+                charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].viewportMinimum);
+                charts[1].axisX[0].set("viewportMaximum", charts[0].axisY[0].viewportMaximum);
+            });
+            document.getElementById("ThreeMonths").addEventListener("click", function() {
+                var lastDate = new Date(Candles[Candles.length - 1].x)
+                lastDate.setDate(lastDate.getDate() - 3 * 31)
+
+                charts[0].axisX[0].set("viewportMinimum", lastDate, false);
+                charts[0].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+
+                for (var i = 2; i < charts.length; i++) {
+                    charts[i].axisX[0].set("viewportMinimum", lastDate, false);
+                    charts[i].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                    charts[i].axisY[0].set("margin", charts[0].axisY[0].bounds.x2 - (charts[i].axisY[0].bounds.x2 - charts[i].axisY[0].bounds.x1));
+                }
+
+                charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].viewportMinimum);
+                charts[1].axisX[0].set("viewportMaximum", charts[0].axisY[0].viewportMaximum);
+            });
+            document.getElementById("All").addEventListener("click", function() {
+                charts[0].axisX[0].set("viewportMinimum", null, false);
+                charts[0].axisX[0].set("viewportMaximum", null);
+
+                for (var i = 2; i < charts.length; i++) {
+                    charts[i].axisX[0].set("viewportMinimum", lastDate, false);
+                    charts[i].axisX[0].set("viewportMaximum", new Date(areaBlock[areaBlock.length - 1].x));
+                    charts[i].axisY[0].set("margin", charts[0].axisY[0].bounds.x2 - (charts[i].axisY[0].bounds.x2 - charts[i].axisY[0].bounds.x1));
+                }
+                charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].viewportMinimum);
+                charts[1].axisX[0].set("viewportMaximum", charts[0].axisY[0].viewportMaximum);
+            });
+
+            function onClickCandles(e) {
+                if (document.getElementById("LevelsBtnSh").value == "Short*") {
+                    var clrs = ["red", "pink", "magenta", "violet", "red", "pink", "magenta",
+                        "violet", "red", "pink", "magenta", "violet"
+                    ];
+                    var levels = [0.5, 0.666666667, 0.75, 1]; //0.8,0.857142857, 0.9, 1];
+                    var nms = ["1xShort", "2xShort", "3xShort", "LocalHigh"]; //"5xShort", "7xShort", "10xShort","LocalHigh"];
+                    for (var k = 0; k < levels.length; k++) {
+                        var marg = [];
+                        marg.push({
+                            x: e.dataPoint.x,
+                            y: e.dataPoint.y[1] * levels[k]
+                        });
+                        marg.push({
+                            x: new Date(areaBlock[areaBlock.length - 1].x),
+                            y: e.dataPoint.y[1] * levels[k]
+                        });
+                        console.log(charts[0].data);
+                        charts[0].options.data.push({
+                            name: nms[k],
+                            yValueFormatString: "#,###.##",
+                            type: "line",
+                            lineDashType: "dash",
+                            lineThickness: 0.9,
+                            color: clrs[count_levels],
+                            markerType: "none",
+                            dataPoints: marg,
+                            highlightEnabled: false,
+                            showInLegend: true,
+                            toolTipContent: null,
+                            visible: true,
+                        });
+
+                        charts[0].options.axisY.stripLines.push({
+                            value: e.dataPoint.y[1] * levels[k],
+                            label: CanvasJS.formatNumber(e.dataPoint.y[1] * levels[k]),
+                            labelPlacement: "outside",
+                            lineThickness: 1,
+                            color: "transparent",
+                            lineDashType: "dot",
+                            labelFontColor: clrs[count_levels],
+                            labelBackgroundColor: "#666666"
+                        });
+
+                    };
+                    document.getElementById("LevelsBtnSh").value = "Short"
+                    document.getElementById("LevelsBtnSh").style.opacity = "1";
+                } else if (document.getElementById("LevelsBtnLn").value == "Long*") {
+                    var clrs = ["blue", "pink", "magenta", "violet", "red", "pink", "magenta",
+                        "violet", "red", "pink", "magenta", "violet"
+                    ];
+                    var levels = [2, 1.5, 1.333333333, 1]; //1.25,1.1666666666667, 1.111111111111111, 1];
+                    var nms = ["2xLong", "3xLong", "4xLong", "LocalHigh"]; //"4xShort", "5xShort", "7xShort","LocalHigh"];
+                    for (var k = 0; k < levels.length; k++) {
+                        var marg = [];
+                        marg.push({
+                            x: e.dataPoint.x,
+                            y: e.dataPoint.y[2] * levels[k]
+                        });
+                        marg.push({
+                            x: new Date(areaBlock[areaBlock.length - 1].x),
+                            y: e.dataPoint.y[2] * levels[k]
+                        });
+                        charts[0].options.data.push({
+                            name: nms[k],
+                            yValueFormatString: "#,###.##",
+                            type: "line",
+                            lineDashType: "dash",
+                            lineThickness: 0.9,
+                            color: clrs[count_levels],
+                            markerType: "none",
+                            dataPoints: marg,
+                            highlightEnabled: false,
+                            showInLegend: true,
+                            toolTipContent: null,
+                            visible: true,
+                        });
+
+                        charts[0].options.axisY.stripLines.push({
+                            value: e.dataPoint.y[1] * levels[k],
+                            label: CanvasJS.formatNumber(e.dataPoint.y[1] * levels[k]),
+                            labelPlacement: "outside",
+                            lineThickness: 1,
+                            color: "transparent",
+                            lineDashType: "dot",
+                            labelFontColor: clrs[count_levels],
+                            labelBackgroundColor: "#666666"
+                        });
+                    };
+                    document.getElementById("LevelsBtnLn").value = "Long"
+                    document.getElementById("LevelsBtnLn").style.opacity = "1";
+                }
+                charts[0].render();
+                count_levels = count_levels + 1;
+            };
+
+            document.getElementsByClassName("canvasjs-chart-canvas")[1].addEventListener("wheel", function(e) {
+                e.preventDefault();
+
+                if (e.clientX < charts[0].plotArea.x1 || e.clientX > charts[0].plotArea.x2 || e.clientY < charts[0].plotArea.y1 || e.clientY > charts[0].plotArea.y2)
+                    return;
+
+                var axisX = charts[0].axisX[0];
+                var viewportMin = axisX.get("viewportMinimum"),
+                    viewportMax = axisX.get("viewportMaximum"),
+                    interval = (axisX.get("viewportMaximum") - axisX.get("viewportMinimum")) / 20
+                var newViewportMin = null,
+                    newViewportMax = null;
+
+                if (e.deltaY < 0) {
+                    newViewportMin = viewportMin + interval;
+                    newViewportMax = viewportMax - interval;
+                } else if (e.deltaY > 0) {
+                    newViewportMin = viewportMin - interval;
+                    newViewportMax = viewportMax + interval;
+                }
+                if (newViewportMin >= charts[0].axisX[0].get("minimum") && newViewportMax <= charts[0].axisX[0].get("maximum") && (newViewportMax - newViewportMin) > (2 * interval)) {
+                    for (var i = 0; i < charts.length; i++) {
+                        if (i != 1) {
+                            charts[i].axisX[0].set("viewportMinimum", newViewportMin, false);
+                            charts[i].axisX[0].set("viewportMaximum", newViewportMax);
+                        }
+                    }
+                    charts[1].axisY[0].set("viewportMinimum", charts[0].axisY[0].get("viewportMinimum"), false);
+                    charts[1].axisY[0].set("viewportMaximum", charts[0].axisY[0].get("viewportMinimum"));
+                }
+
+            });
+            document.getElementById("yZoomOut").addEventListener("click", function() {
+                var axisY = charts[0].axisY[0];
+                var viewportMin = axisY.get("viewportMinimum"),
+                    viewportMax = axisY.get("viewportMaximum"),
+                    interval = (axisY.get("viewportMaximum") - axisY.get("viewportMinimum")) / 20
+                var newViewportMin = null,
+                    newViewportMax = null;
+
+                newViewportMin = viewportMin - interval;
+                newViewportMax = viewportMax + interval;
+
+                console.log(charts[0].axisY[0].get("minimum"))
+                if (newViewportMin >= charts[0].axisY[0].get("minimum") && (newViewportMax - newViewportMin) > (interval)) {
+
+                    charts[0].axisY[0].set("viewportMinimum", newViewportMin, false);
+
+                    charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].get("viewportMinimum"), false);
+                }
+
+                if (newViewportMax <= charts[0].axisY[0].get("maximum") && (newViewportMax - newViewportMin) > (interval)) {
+
+                    charts[0].axisY[0].set("viewportMaximum", newViewportMax);
+
+                    charts[1].axisX[0].set("viewportMaximum", charts[0].axisY[0].get("viewportMaximum"));
+                }
+            });
+            document.getElementById("yZoomIn").addEventListener("click", function() {
+                var axisY = charts[0].axisY[0];
+                var viewportMin = axisY.get("viewportMinimum"),
+                    viewportMax = axisY.get("viewportMaximum"),
+                    interval = (axisY.get("viewportMaximum") - axisY.get("viewportMinimum")) / 20
+                var newViewportMin = null,
+                    newViewportMax = null;
+
+                newViewportMin = viewportMin + interval;
+                newViewportMax = viewportMax - interval;
+
+                console.log(charts[0].axisY[0].get("minimum"))
+                if (newViewportMin >= charts[0].axisY[0].get("minimum") && (newViewportMax - newViewportMin) > (interval)) {
+
+                    charts[0].axisY[0].set("viewportMinimum", newViewportMin, false);
+
+                    charts[1].axisX[0].set("viewportMinimum", charts[0].axisY[0].get("viewportMinimum"), false);
+                }
+
+                if (newViewportMax <= charts[0].axisY[0].get("maximum") && (newViewportMax - newViewportMin) > (interval)) {
+
+                    charts[0].axisY[0].set("viewportMaximum", newViewportMax);
+
+                    charts[1].axisX[0].set("viewportMaximum", charts[0].axisY[0].get("viewportMaximum"));
+                }
+            });
+
+            document.getElementById("ResistBtn").addEventListener("click", function() {
+                console.log("check")
+                for (var k = 0; k < resistances.length; k++) {
+                            charts[1].options.axisX.stripLines.push({
+                            value: resistances[k],
+                            label: "",
+                            labelPlacement: "outside",
+                            lineThickness: 1,
+                            labelFontSize:10,
+                            color: "yellow",
+                            lineDashType: "dot",
+                            labelFontColor: "yellow",
+                            labelBackgroundColor: "#666666"
+                        });
+                        charts[0].options.axisY.stripLines.push({
+                            value: resistances[k],
+                            label: CanvasJS.formatNumber(resistances[k]),
+                            labelPlacement: "outside",
+                            lineThickness: 1,
+                            labelFontSize:10,
+                            color: "yellow",
+                            lineDashType: "dot",
+                            labelFontColor: "yellow",
+                            labelBackgroundColor: "#666666"
+                        });
+                    }
+                    charts[1].render();
+                    charts[0].render();
+            });
+
+            document.getElementById("BuySellZone").addEventListener("click", function() {
+                if (charts[0].data[6].get("visible")){
+                    charts[0].data[6].set("visible", false);
+                    charts[0].data[7].set("visible", false);
+                    document.getElementById("BuySellZone").style.opacity="0.5";
+                }
+                else {
+                    charts[0].data[6].set("visible", true);
+                    charts[0].data[7].set("visible", true);
+                    document.getElementById("BuySellZone").style.opacity="1";
+                }
+            });
+
+            document.getElementById("EMATrend").addEventListener("click", function() {
+                if (charts[0].data[10].get("visible")){
+                    charts[0].data[10].set("visible", false);
+                    charts[0].data[11].set("visible", false);
+                    document.getElementById("EMATrend").style.opacity="0.5";
+                }
+                else {
+                    charts[0].data[10].set("visible", true);
+                    charts[0].data[11].set("visible", true);
+                    document.getElementById("EMATrend").style.opacity="1";
+                }
+            });
+
+            window.addEventListener('resize', function(event) {
+                charts[1].set("height",innerWidth * 0.3);
+            }, true);
+        }
+
+        function toggle(button) {
+            if (button.value == "Short") {
+                button.value = "Short*";
+                button.style.opacity = "0.5";
+            } else if (button.value == "Long") {
+                button.value = "Long*";
+                button.style.opacity = "0.5";
+
+            }
+        }
+    </script>
+
+</head>
+
+
+
+</html>
