@@ -216,7 +216,6 @@ class BotStarter:
         else:
             config = self.get_config_from_pythonanywhere()
         ticker_list = list(config.keys())
-
         timeframes = ['1W', '1d']
 
         #### Read Data ####
