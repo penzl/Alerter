@@ -74,9 +74,7 @@ def convert_seconds(seconds):
 
 def message_reader(alrts, Long=False):
     str0 = ""
-    # prev_val = ["", "", "", "", ""]
-    # symbol_sh = [symbol_list[i].replace("-USD", "").replace("-EUR", "").replace("1", "") for i in range(len(values))]
-    # alrts2 = [i for i in alrts if i[2] != "pct_changes"]
+    alrts = [alrt for alrt in alrts if alrt[2] != 'EMA_trend_negative' and alrt[2] != 'EMA_trend_positive']
     lngth = len(alrts)
     for count, value in enumerate(alrts):
         age = ", Age: " + convert_seconds((datetime.now() - value[4]).total_seconds())
@@ -96,10 +94,11 @@ def message_reader_combine_alerts(messages2):
     str0 = "Combined alerts:"
     alert_kinds = ["rsi < 30", "rsi > 70", "1w_rsi > 50 & 1d_rsi < 50 & 1d_hist_ch>0",
                    "1w_rsi < 50 & 1d_rsi < 30 & 1d_hist_ch>0", "close_to_", "crossed_",
-                   "in_accum_zone", "in_reduc_zone", "close_2_21MA", "out_of_BB","EMA_trend_grey"]
+                   "in_accum_zone", "in_reduc_zone", "close_2_21MA", "out_of_BB",
+                   "EMA_trend_grey","EMA_trend_positive","EMA_trend_negative"]
     alert_text = ["Sellof (RSI<30)", "Cash-out (RSI>70)", "BullDCA", "BearDCA", "Close to trend",
                   "Crossed trend", "In Accum. Zone", "In Reduc. Zone", "Close to 21W SMA (<2%)",
-                  "Out of Bollinger Bands","EMA trend is changing"]
+                  "Out of Bollinger Bands", "EMA trend is changing","Bullish trend","Bearish trend"]
     for count, alert_kind in enumerate(alert_kinds):
         str_new = "\n\n" + emoji.emojize(':small_blue_diamond:', use_aliases=True) + alert_text[count] + ": "
         check_if_empty = False
@@ -128,7 +127,7 @@ class AlertList:
         for kline_size in self.timeframes:
             columns = ['Symb', 'close', kline_size + '_ch',
                        kline_size + '_rsi', kline_size + '_Stoch.K', kline_size + '_Stoch.D', kline_size + '_MA21',
-                       kline_size + '_BBl', kline_size + '_BBh',kline_size + '_EMA31', kline_size + '_EMA59']
+                       kline_size + '_BBl', kline_size + '_BBh', kline_size + '_EMA31', kline_size + '_EMA59']
             dataframe = pd.DataFrame(
                 columns=columns)
             if verbosity:
@@ -368,7 +367,7 @@ class BotStarter:
                 if alert:
                     self.bot.sendMessage(self.chat_id,
                                          emoji.emojize(':heavy_exclamation_mark:', use_aliases=True) +
-                                         value.replace("-USD", "").replace("1", "")+ ": " + str_label,
+                                         value.replace("-USD", "").replace("1", "") + ": " + str_label,
                                          disable_notification=False)
                     print("NEW Message: " + str(msg))
             else:
@@ -411,7 +410,9 @@ class BotStarter:
                     w_change = w_change + emoji.emojize(':evergreen_tree:', use_aliases=True)
                 else:
                     w_change = w_change + emoji.emojize(':red_triangle_pointed_down:', use_aliases=True)
-                str_label = price + ", " + d_change + " (week: " + w_change + ")"
+                trend_str = ", trend bearish " if (float(dataframe["1d_EMA31"][count]) -
+                                                      float(dataframe["1d_EMA59"][count])) < 0 else ", trend bullish"
+                str_label = price + ", " + d_change + " (week: " + w_change + ")" + trend_str
                 messages = self.alert_creator(True, value, "None",
                                               "pct_changes", str_label, previous_messages, messages,
                                               alert=False)
@@ -445,7 +446,7 @@ class BotStarter:
                     Sell Strategy 1
                     '''
                     str_label = "Cash-out SELL alert " + emoji.emojize(':money_bag:', use_aliases=True) + "," + \
-                                 kline_size + " Price: " \
+                                kline_size + " Price: " \
                                 + dataframe["close"][count] + ", RSI = " + dataframe[kline_size + "_rsi"][count]
                     strategy_label = "rsi > 70"
 
@@ -618,7 +619,7 @@ class BotStarter:
                 messages = self.alert_creator(condition, value, "1d",
                                               strategy_label, str_label, previous_messages, messages, alert=False)
                 '''
-                EMA trend
+                EMA trend switch
                 '''
                 str_label = "EMA trend in grey zone: " + value + ", " + ", Price: " \
                             + dataframe["close"][count] + ", EMA31 = " + dataframe["1d_EMA31"][count] + \
@@ -629,6 +630,22 @@ class BotStarter:
                     / (float(dataframe["1d_EMA31"][count]) + float(dataframe["1d_EMA59"][count]))) < 0.01
                 messages = self.alert_creator(condition, value, "1d",
                                               strategy_label, str_label, previous_messages, messages)
+
+                '''
+                EMA trend positive
+                '''
+                strategy_label = "EMA_trend_positive"
+                condition = ", trend bullish" == trend_str
+                messages = self.alert_creator(condition, value, "1d",
+                                              strategy_label, trend_str, previous_messages, messages)
+                '''
+                EMA trend negative
+                '''
+                strategy_label = "EMA_trend_negative"
+                condition = ", trend bearish" == trend_str
+                messages = self.alert_creator(condition, value, "1d",
+                                              strategy_label, trend_str, previous_messages, messages)
+
             # except:
             #    print("Couldnt check strategy for " + value)
         # print(messages)
