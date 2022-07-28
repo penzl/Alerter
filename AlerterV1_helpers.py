@@ -410,7 +410,7 @@ class BotStarter:
                     w_change = w_change + emoji.emojize(':evergreen_tree:', use_aliases=True)
                 else:
                     w_change = w_change + emoji.emojize(':red_triangle_pointed_down:', use_aliases=True)
-                trend_str = ", trend bearish " if (float(dataframe["1d_EMA31"][count]) -
+                trend_str = ", trend bearish" if (float(dataframe["1d_EMA31"][count]) -
                                                       float(dataframe["1d_EMA59"][count])) < 0 else ", trend bullish"
                 str_label = price + ", " + d_change + " (week: " + w_change + ")" + trend_str
                 messages = self.alert_creator(True, value, "None",
