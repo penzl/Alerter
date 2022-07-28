@@ -637,14 +637,14 @@ class BotStarter:
                 strategy_label = "EMA_trend_positive"
                 condition = ", trend bullish" == trend_str
                 messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, trend_str, previous_messages, messages)
+                                              strategy_label, trend_str, previous_messages, messages, alert=False)
                 '''
                 EMA trend negative
                 '''
                 strategy_label = "EMA_trend_negative"
                 condition = ", trend bearish" == trend_str
                 messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, trend_str, previous_messages, messages)
+                                              strategy_label, trend_str, previous_messages, messages, alert=False)
 
             # except:
             #    print("Couldnt check strategy for " + value)
