@@ -95,10 +95,12 @@ def message_reader_combine_alerts(messages2):
     alert_kinds = ["rsi < 30", "rsi > 70", "1w_rsi > 50 & 1d_rsi < 50 & 1d_hist_ch>0",
                    "1w_rsi < 50 & 1d_rsi < 30 & 1d_hist_ch>0", "close_to_", "crossed_",
                    "in_accum_zone", "in_reduc_zone", "close_2_21MA", "out_of_BB",
-                   "EMA_trend_grey","EMA_trend_positive","EMA_trend_negative"]
+                   "EMA_trend_grey", "EMA_trend_positive", "EMA_trend_negative"]
     alert_text = ["Sellof (RSI<30)", "Cash-out (RSI>70)", "BullDCA", "BearDCA", "Close to trend",
                   "Crossed trend", "In Accum. Zone", "In Reduc. Zone", "Close to 21W SMA (<2%)",
-                  "Out of Bollinger Bands", "EMA trend is changing","Bullish trend","Bearish trend"]
+                  "Out of Bollinger Bands", "EMA trend is changing",
+                  "Bullish trend " + emoji.emojize(':cow_face:', use_aliases=True),
+                  "Bearish trend " + emoji.emojize(':bear:', use_aliases=True)]
     for count, alert_kind in enumerate(alert_kinds):
         str_new = "\n\n" + emoji.emojize(':small_blue_diamond:', use_aliases=True) + alert_text[count] + ": "
         check_if_empty = False
@@ -410,8 +412,11 @@ class BotStarter:
                     w_change = w_change + emoji.emojize(':evergreen_tree:', use_aliases=True)
                 else:
                     w_change = w_change + emoji.emojize(':red_triangle_pointed_down:', use_aliases=True)
-                trend_str = ", trend bearish" if (float(dataframe["1d_EMA31"][count]) -
-                                                      float(dataframe["1d_EMA59"][count])) < 0 else ", trend bullish"
+                trend_str = "\n  " + emoji.emojize(':bear:', use_aliases=True) + \
+                            "BEAR EMA trend" if (float(dataframe["1d_EMA31"][count]) -
+                                             float(dataframe["1d_EMA59"][count])) < 0 else \
+                    "\n  " + emoji.emojize(':cow_face:', use_aliases=True) + \
+                    " BULL EMA trend"
                 str_label = price + ", " + d_change + " (week: " + w_change + ")" + trend_str
                 messages = self.alert_creator(True, value, "None",
                                               "pct_changes", str_label, previous_messages, messages,
@@ -632,17 +637,12 @@ class BotStarter:
                                               strategy_label, str_label, previous_messages, messages)
 
                 '''
-                EMA trend positive
+                EMA trend positive/negative
                 '''
-                strategy_label = "EMA_trend_positive"
-                condition = ", trend bullish" == trend_str
-                messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, trend_str, previous_messages, messages, alert=False)
-                '''
-                EMA trend negative
-                '''
-                strategy_label = "EMA_trend_negative"
-                condition = ", trend bearish" == trend_str
+                strategy_label = 'EMA_trend_negative' if (float(dataframe["1d_EMA31"][count]) -
+                                                          float(dataframe["1d_EMA59"][
+                                                                    count])) < 0 else 'EMA_trend_positive'
+                condition = True
                 messages = self.alert_creator(condition, value, "1d",
                                               strategy_label, trend_str, previous_messages, messages, alert=False)
 
