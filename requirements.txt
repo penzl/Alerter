@@ -1,0 +1,7 @@
+pandas~=1.4.2
+telepot~=12.7
+emoji~=1.6.3
+numpy~=1.22.3
+yfinance~=0.1.70
+requests~=2.27.1
+ta~=0.9.0
