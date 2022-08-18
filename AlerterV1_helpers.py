@@ -206,7 +206,7 @@ class AlertList:
 
 class BotStarter:
     def __init__(self, TELEPOT_BOT, CHAT_ID,
-                 use_local_config_or_pythonanywhere, PA_USERNAME, PA_API_TOKEN, LABEL):
+                 use_local_config_or_pythonanywhere, PA_USERNAME, PA_API_TOKEN, LABEL, LOC_STRING):
         # self.binance_client = None
         self.bot = telepot.Bot(TELEPOT_BOT)
         # self.bot_btc = telepot.Bot(TELEPOT_BOT_TEST)
@@ -216,10 +216,11 @@ class BotStarter:
         self.PA_USERNAME = PA_USERNAME
         self.PA_API_TOKEN = PA_API_TOKEN
         self.LABEL = LABEL
+        self.LOC_STRING = LOC_STRING
 
     def loop_this(self):
         if self.use_local_config_or_pythonanywhere:
-            with open('config.json', 'r') as f:
+            with open(self.LOC_STRING + 'config.json', 'r') as f:
                 config = json.load(f)
                 # list_USDT = [config[key][0] for key in config.keys()] with tradingview
         else:
@@ -228,8 +229,8 @@ class BotStarter:
         timeframes = ['1W', '1d']
 
         #### Read Data ####
-        if exists("messages_" + self.LABEL + ".pickle"):
-            with open("messages_" + self.LABEL + ".pickle", 'rb') as handle2:
+        if exists(self.LOC_STRING + "messages_" + self.LABEL + ".pickle"):
+            with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'rb') as handle2:
                 alerts = pickle.load(handle2)
                 print("Read messages")
         else:
@@ -246,7 +247,7 @@ class BotStarter:
 
             full_data = AlertList(ticker_list, timeframes).show_me_the_money_joined()
 
-            with open("dataframe_" + self.LABEL + ".pickle", 'wb') as handle2:
+            with open(self.LOC_STRING + "dataframe_" + self.LABEL + ".pickle", 'wb') as handle2:
                 pickle.dump(full_data, handle2)
                 print("saved messages")
 
@@ -255,10 +256,15 @@ class BotStarter:
 
             alerts = self.check_strategy(ticker_list, full_data, timeframes, alerts)
 
-            with open("messages_" + self.LABEL + ".pickle", 'wb') as handle2:
+            with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'wb') as handle2:
                 pickle.dump(alerts, handle2)
                 print("saved messages")
-            self.put_messages_to_pythonanywhere(alerts)
+            if self.use_local_config_or_pythonanywhere:
+                with open(self.LOC_STRING + "messages.txt", "w",encoding='utf-8') as text_file:
+                    text_file.write(message_reader(alerts))
+                print("messages saved in file...")
+            else:
+                self.put_messages_to_pythonanywhere(alerts)
             # except:
             #    print("Error, trying again in 15 min")
             # cont = False
@@ -308,7 +314,7 @@ class BotStarter:
                 # bot.sendMessage(chat_id, msg['text'])
                 if msg['text'] == "/sendpics":
                     self.bot.sendMessage(chat_id, "here it is:")
-                    with open("dataframe_" + self.LABEL + ".pickle", 'rb') as handle2:
+                    with open(self.LOC_STRING + "dataframe_" + self.LABEL + ".pickle", 'rb') as handle2:
                         dfi.export(pickle.load(handle2).style.apply(apply_style)
                                    , "mytablelist_" + self.LABEL + ".png")
                     self.bot.sendPhoto(chat_id, photo=open('mytablelist_' + self.LABEL + '.png', 'rb'))
@@ -316,7 +322,7 @@ class BotStarter:
                     self.bot.sendMessage(chat_id, "... and kicking!")
                 if msg['text'] == "/alerts":
                     self.bot.sendMessage(chat_id, "http://penzl.pythonanywhere.com/\nActive alerts:")
-                    with open("messages_" + self.LABEL + ".pickle", 'rb') as handle:
+                    with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'rb') as handle:
                         alerts_bot = pickle.load(handle)
                     if len(alerts_bot) == 0:
                         self.bot.sendMessage(chat_id, "No *" + self.LABEL + " alerts, bro!")
@@ -325,7 +331,7 @@ class BotStarter:
                         self.bot.sendMessage(chat_id, message_reader_combine_alerts(alerts_bot))
                 if msg['text'] == "/longalerts":
                     self.bot.sendMessage(chat_id, "http://penzl.pythonanywhere.com/\nActive alerts:")
-                    with open("messages_" + self.LABEL + ".pickle", 'rb') as handle:
+                    with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'rb') as handle:
                         alerts_bot = pickle.load(handle)
                     if len(alerts_bot) == 0:
                         self.bot.sendMessage(chat_id, "No *" + self.LABEL + " alerts, bro!")
@@ -334,7 +340,7 @@ class BotStarter:
                         self.bot.sendMessage(chat_id, message_reader_combine_alerts(alerts_bot))
                 if msg['text'] == "/showpairs":
                     if self.use_local_config_or_pythonanywhere:
-                        with open('config.json', 'r') as f:
+                        with open(self.LOC_STRING + 'config.json', 'r') as f:
                             config = json.load(f)
                             # list_USDT = [config[key][0] for key in config.keys()] with tradingview
                     else:
@@ -359,7 +365,7 @@ class BotStarter:
                     self.bot.sendMessage(chat_id, str0)
                 if msg['text'] == "/removemessages":
                     self.bot.sendMessage(chat_id, "Removing all old messages (" + self.LABEL + ")!")
-                    with open("messages_" + self.LABEL + ".pickle", 'wb') as handle2:
+                    with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'wb') as handle2:
                         pickle.dump([], handle2)
                         print("saved empty messages")
 
@@ -399,7 +405,7 @@ class BotStarter:
         messages = []
         f_form_sh = "{:.5g}".format
         if self.use_local_config_or_pythonanywhere:
-            with open('config.json', 'r') as f:
+            with open(self.LOC_STRING + 'config.json', 'r') as f:
                 config = json.load(f)
                 # list_USDT = [config[key][0] for key in config.keys()] with tradingview
         else:
