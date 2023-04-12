@@ -1,22 +1,29 @@
 # IMPORTS
+import copy
+
 import pandas as pd
+import sys
 from datetime import datetime
 import dataframe_image as dfi
 import telepot
-import urllib3
+# import urllib3
 from telepot.loop import MessageLoop
-import copy
+# import copy
 import emoji
 import pickle
-import json
+#import json
 import numpy as np
 import yfinance as yf
-from ta.momentum import RSIIndicator, StochasticOscillator
-from ta.trend import SMAIndicator, EMAIndicator
-from ta.volatility import BollingerBands
-import requests
-from urllib.parse import urljoin
+# from ta.momentum import RSIIndicator, StochasticOscillator
+# from ta.trend import SMAIndicator, EMAIndicator
+# from ta.volatility import BollingerBands
+# import requests
+# from urllib.parse import urljoin
 from os.path import exists
+from ruamel import yaml
+import strategies
+import indicators
+import logging
 
 # uncomment this if its on pythonanywhere
 # proxy_url = "http://proxy.server:3128"
@@ -26,37 +33,47 @@ from os.path import exists
 # telepot.api._onetime_pool_spec = (urllib3.ProxyManager, dict(proxy_url=proxy_url, num_pools=1, maxsize=1, retries=False, timeout=30))
 
 
-def get_data_yahoo(symbol, kline_size):
-    if kline_size == '1d':
-        dta = yf.Ticker(symbol).history(period='1y',
+def get_data_yahoo(symbol, ta_list=[], ta_list_global=[], last_only=True):
+    logging.info("\t\t\t* Getting yahoo data for %s" % symbol)
+    dta_day = yf.Ticker(symbol).history(period='2y',
                                         interval='1d', actions=False)[['Open', 'High', 'Low', 'Close', 'Volume']]
-    if kline_size == '1W':
-        dt_day = yf.Ticker(symbol).history(period='1y',
-                                           interval='1d', actions=False)[['Open', 'High', 'Low', 'Close', 'Volume']]
-        dta = dt_day.asfreq('W-SUN', method='pad')
-        dta.index = dta.index.shift(-6, freq='D')
-        price_today = dt_day.iloc[[-1]]
-        price_today.index = price_today.index.shift(-price_today.index[0].dayofweek, freq='D')
-        dta = pd.concat([dta, price_today], ignore_index=False, axis=0)
+    logging.debug("\t\t\t #  Calculating daily change in percentage...")
+    dta_day = CHANGE1d(dta_day, "_day")
+    dta_day = CHANGE7d(dta_day, "_day")
 
-    dta["RSI"] = RSIIndicator(close=dta['Close'], window=14).rsi()
-    stoch = StochasticOscillator(high=dta['High'],
-                                 close=dta['Close'],
-                                 low=dta['Low'],
-                                 window=14,
-                                 smooth_window=3)
-    dta["StochK"], dta["StochD"] = stoch.stoch(), stoch.stoch_signal()
-    dta["MA21"] = SMAIndicator(close=dta['Close'], window=21).sma_indicator()
-    dta["BB_high"] = BollingerBands(close=dta['Close'], window=21, window_dev=2).bollinger_hband()
-    dta["BB_low"] = BollingerBands(close=dta['Close'], window=21, window_dev=2).bollinger_lband()
-    dta["EMA31"] = EMAIndicator(close=dta['Close'], window=31).ema_indicator()
-    dta["EMA59"] = EMAIndicator(close=dta['Close'], window=59).ema_indicator()
-    return dta
+    list_of_indicators = []
+    logging.debug("\t\t\t #  Putting together list of indicators")
+    for TA in ta_list_global + list(set(ta_list) - set(ta_list_global)):  # Removing Duplicates in list!
+        try:
+            list_of_indicators = list_of_indicators + getattr(strategies, TA)(check=True)
+        except Exception as e:
+            logging.error("Strategy %s probably not defined in strategies.py, "
+                          "error %s" % (TA, e))
+    list_of_indicators = np.unique(list_of_indicators)
+    logging.info("\t\t\t  %s: Calculating indicators: %s" % (symbol, list_of_indicators))
+    dta_week = pd.DataFrame()
+    if any(ele.endswith('_week') for ele in list_of_indicators):
+        dta_week = yf.Ticker(symbol).history(period='1y',
+                                             interval='1wk', actions=False)[['Open', 'High', 'Low', 'Close', 'Volume']]
+    for indicator in list_of_indicators:
+        try:
+            if indicator.endswith('_week'):
+                dta_week = getattr(indicators, indicator.replace('_week', ''))(dta_week, '_week')
+                dta_day[str(indicator)] = dta_week[indicator]  # for some reason it makes it a numpy string...
+            elif indicator.endswith('_day'):
+                dta_day = getattr(indicators, indicator.replace('_day', ''))(dta_day, '_day')
+            else:
+                logging.error("Indicator %s has to timeframe selected. MUST end with _day or _week ")
+        except Exception as e:
+            logging.error("Indicator %s not defined in indicators.py, "
+                          "error: %s" % (indicator, e))
+    if last_only:
+        return dta_day.iloc[-1].round(5).to_dict()
+    else:
+        return dta_day
 
 
 def apply_style(column):
-    # return [col_data['positive_cell'] if True else col_data['negative_cell']
-    # for val in column]
     if "rsi" in column.name:
         return ["color:green" if float(val) < 40 else "color:black" for val in column]
     if "hist_ch" in column.name:
@@ -82,41 +99,35 @@ def convert_seconds(seconds):
 
 def message_reader(alrts, Long=False):
     str0 = ""
-    alrts = [alrt for alrt in alrts if alrt[2] != 'EMA_trend_negative' and alrt[2] != 'EMA_trend_positive']
-    lngth = len(alrts)
+    alerts_length = len(alrts)
+    new_ticker = True
     for count, value in enumerate(alrts):
-        age = ", Age: " + convert_seconds((datetime.now() - value[4]).total_seconds())
-        next_tckr = alrts[count + 1][0] if count < lngth - 1 else ""
-        if value[2] == "pct_changes":
-            if next_tckr == value[0] or Long:
-                str0 = str0 + "\n\n" + emoji.emojize(':small_blue_diamond:', use_aliases=True) \
-                       + value[0].replace("-USD", "").replace("1", "") + ":   " + value[3]
+        age = ", Age: " + convert_seconds((datetime.now() - value["time"]).total_seconds())
+        if new_ticker or Long:
+            str0 = str0 + "\n\n" + emoji.emojize(':small_blue_diamond:', use_aliases=True) \
+                   + value["ticker"].replace("-USD", "").replace("1", "") + ":   " + value["string"]
         else:
-            str0 = str0 + "\n\t" + emoji.emojize(':white_small_square:', use_aliases=True) \
-                   + value[3] + age
-        # prev_val = copy.deepcopy(value)
+            str0 = str0 + "\n\t   " + emoji.emojize(':white_small_square:', use_aliases=True) \
+                   + value["string"] + age
+        if value["ticker"] == alrts[count + 1]["ticker"] if count < alerts_length - 1 else "":
+            new_ticker = False
+        else:
+            new_ticker = True
     return str0
 
 
 def message_reader_combine_alerts(messages2):
     str0 = "Combined alerts:"
-    alert_kinds = ["rsi < 30", "rsi > 70", "1w_rsi > 50 & 1d_rsi < 50 & 1d_hist_ch>0",
-                   "1w_rsi < 50 & 1d_rsi < 30 & 1d_hist_ch>0", "close_to_", "crossed_",
-                   "in_accum_zone", "in_reduc_zone", "close_2_21MA", "out_of_BB",
-                   "EMA_trend_grey", "EMA_trend_positive", "EMA_trend_negative"]
-    alert_text = ["Sellof (RSI<30)", "Cash-out (RSI>70)", "BullDCA", "BearDCA", "Close to trend",
-                  "Crossed trend", "In Accum. Zone", "In Reduc. Zone", "Close to 21W SMA (<2%)",
-                  "Out of Bollinger Bands", "EMA trend is changing",
-                  "Bullish trend " + emoji.emojize(':cow_face:', use_aliases=True),
-                  "Bearish trend " + emoji.emojize(':bear:', use_aliases=True)]
+    alert_kinds = list(np.unique([iii["label"] for iii in messages2]))
+    if 'show_change' in alert_kinds: alert_kinds.remove('show_change')
     for count, alert_kind in enumerate(alert_kinds):
-        str_new = "\n\n" + emoji.emojize(':small_blue_diamond:', use_aliases=True) + alert_text[count] + ": "
+        str_new = "\n\n" + emoji.emojize(':small_blue_diamond:', use_aliases=True) + alert_kind + ": "
         check_if_empty = False
         for _, value in enumerate(messages2):
-            if alert_kind in value[2]:
+            if alert_kind in value["label"]:
                 str_new = str_new + "\n\t" + emoji.emojize(':white_small_square:', use_aliases=True) \
-                          + value[0].replace("-USD", "").replace("1",
-                                                                 "")  # + ": " + value[3].replace(value[0] + ",", '') + age
+                          + value["ticker"].replace("-USD", "").replace("1",
+                                                                 "")
                 check_if_empty = True
         if check_if_empty:
             str0 = str0 + str_new
@@ -124,192 +135,84 @@ def message_reader_combine_alerts(messages2):
 
 
 class AlertList:
-    def __init__(self, ticker_list, timeframes):
-        self.ticker_list = ticker_list
-        self.timeframes = timeframes
+    def __init__(self, config):
+        self.ticker_list = config["TICKERS"].keys()
+        self.config = config
 
-    def show_me_the_money_joined(self, verbosity=False):
-        f_form = "{:.8g}".format
-        f_form_sh = "{:.3g}".format
-        perc_form = "{:.1%}".format
-        # make daily and weekly data [only works for day and week]
-
-        for kline_size in self.timeframes:
-            columns = ['Symb', 'close', kline_size + '_ch',
-                       kline_size + '_rsi', kline_size + '_Stoch.K', kline_size + '_Stoch.D', kline_size + '_MA21',
-                       kline_size + '_BBl', kline_size + '_BBh', kline_size + '_EMA31', kline_size + '_EMA59']
-            dataframe = pd.DataFrame(
-                columns=columns)
-            if verbosity:
-                print("TIMEFRAME: " + kline_size)
-            index = self.timeframes.index(kline_size)
-            # for [symbol,screener,exchange] in symbol_list: for tradingview
-            for symbol in self.ticker_list:
-                if verbosity:
-                    print(symbol)
-                # new_df = create_data(symbol, kline_size, save=True, verbosity=False)
-                # data = get_data_trading_view(symbol, screener, exchange, kline_size, verbosity=True)
-                # dataframe_new = pd.DataFrame(
-                #     [[symbol,
-                #       f_form(data['close']),
-                #       perc_form(data['change']/100),
-                #       f_form_sh(data['RSI']),
-                #       f_form_sh(data['Stoch.D']),
-                #       f_form_sh(data['Stoch.K']-data['Stoch.D'])]],
-                #     columns=columns)
-                try:
-                    data = get_data_yahoo(symbol, kline_size)
-                    dataframe_new = pd.DataFrame(
-                        [[symbol,
-                          f_form(data['Close'][-1]),
-                          perc_form((data['Close'][-1] - data['Close'][-2]) / data['Close'][-2]),
-                          f_form_sh(data['RSI'][-1]),
-                          f_form_sh(data['StochK'][-1]),
-                          f_form_sh(data['StochD'][-1]),
-                          f_form_sh(data['MA21'][-1]),
-                          f_form_sh(data["BB_low"][-1]),
-                          f_form_sh(data["BB_high"][-1]),
-                          f_form_sh(data["EMA31"][-1]),
-                          f_form_sh(data["EMA59"][-1])
-                          ]],
-                        columns=columns)
-                except Exception as e:
-                    print("Error1: Couldn't get data for " + symbol)
-                    print(e)
-                    dataframe_new = pd.DataFrame(
-                        [[symbol,
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          f_form(np.nan),
-                          ]],
-                        columns=columns)
-                dataframe = pd.concat([dataframe, dataframe_new], ignore_index=True)
-
-            if index == 0:
-                dataframe_full = dataframe
-            else:
-                for i in columns[1:]:
-                    dataframe_full[i] = dataframe[i]
-
-        pd.set_option('display.max_columns', None)
-        if verbosity:
-            print(dataframe_full)
-        return dataframe_full
+    def show_me_the_money_joined(self):
+        ticker_dict = {}
+        for symbol in self.ticker_list:
+            try:
+                ticker_dict[symbol] = get_data_yahoo(symbol, ta_list=self.config["TICKERS"][symbol]["ta_list"],
+                                                     ta_list_global=self.config["SETTINGS"]["ta_list_global"])
+            except Exception as e:
+                logging.error("\t\t\t* Couldn't get data for %s, error: %s" % (symbol, e))
+        # pd.set_option('display.max_columns', None)
+        # logging.debug(pd.DataFrame.from_dict(ticker_dict, orient='index'))
+        return ticker_dict
 
 
 class BotStarter:
-    def __init__(self, TELEPOT_BOT, CHAT_ID,
-                 use_local_config_or_pythonanywhere, PA_USERNAME, PA_API_TOKEN, LABEL, LOC_STRING):
-        # self.binance_client = None
+    def __init__(self, TELEPOT_BOT, CHAT_ID, LABEL, LOC_STRING):
         self.bot = telepot.Bot(TELEPOT_BOT)
-        # self.bot_btc = telepot.Bot(TELEPOT_BOT_TEST)
         self.chat_id = CHAT_ID
-        # self.chat_id_btc = CHAT_ID_TEST
-        self.use_local_config_or_pythonanywhere = use_local_config_or_pythonanywhere
-        self.PA_USERNAME = PA_USERNAME
-        self.PA_API_TOKEN = PA_API_TOKEN
+        #self.PA_USERNAME = PA_USERNAME
+        #self.PA_API_TOKEN = PA_API_TOKEN
         self.LABEL = LABEL
         self.LOC_STRING = LOC_STRING
 
     def loop_this(self):
-        if self.use_local_config_or_pythonanywhere:
-            with open(self.LOC_STRING + 'config.json', 'r') as f:
-                config = json.load(f)
-                # list_USDT = [config[key][0] for key in config.keys()] with tradingview
-        else:
-            config = self.get_config_from_pythonanywhere()
-        ticker_list = list(config.keys())
-        timeframes = ['1W', '1d']
+        logging.info("\t- Checking crypto and stocks and doing TA ...")
+        logging.debug("\t\to Loading config from %s" % (self.LOC_STRING + 'config.yml'))
+        with open(self.LOC_STRING + 'config.yml',
+                  'r') as f:  # TODO: make a config loading function that checks the form
+            config = yaml.safe_load(f)
+        ticker_list = list(config["TICKERS"].keys())
+        logging.info("\t\to Tickers = " + str(ticker_list))
 
-        #### Read Data ####
+        # Read Old Alert Data
         if exists(self.LOC_STRING + "messages_" + self.LABEL + ".pickle"):
             with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'rb') as handle2:
                 alerts = pickle.load(handle2)
-                print("Read messages")
+                logging.info("\t\to Loaded old alerts from pickle file: "
+                             "%s" % (self.LOC_STRING + "messages_" + self.LABEL + ".pickle"))
         else:
-            print("... making fresh messages list...")
+            logging.info("\t\to Making Empty Alerts List ...")
             alerts = []
+        logging.debug("Alerts = " + str(alerts))
 
-        #### Start Loop ####
+        logging.info("\t\to Doing TA:")
+        full_data = AlertList(config).show_me_the_money_joined()
 
-        print("##### Looking for alerts... #####")
-        if 1:
-            ''' Open pairlists here, so i can update them via Telegram ... '''
-            print("Ticker List:")
-            print(ticker_list)
+        # with open(self.LOC_STRING + "output_" + self.LABEL + ".json", 'w') as handle2:
+        #     json.dump(full_data, handle2, sort_keys=True, indent=4)
+        #     logging.info("\t\to Saved TA output to json: "
+        #                  "%s" % (self.LOC_STRING + "output_" + self.LABEL + ".json"))
 
-            full_data = AlertList(ticker_list, timeframes).show_me_the_money_joined()
+        with open(self.LOC_STRING + "output_" + self.LABEL + ".yml", 'w') as handle2:
+            yaml.dump(full_data, handle2, indent=4, default_flow_style=False)
+            logging.info("\t\to Saved TA output to json: "
+                         "%s" % (self.LOC_STRING + "output_" + self.LABEL + ".yml"))
 
-            with open(self.LOC_STRING + "dataframe_" + self.LABEL + ".pickle", 'wb') as handle2:
-                pickle.dump(full_data, handle2)
-                print("saved messages")
+        logging.info("\t\to Doing Strategy analysis...")
+        alerts = self.check_strategy(config, full_data, alerts)
 
-            print("Sending data to telegram!")
-            # bot.sendMessage(chat_id, "-----  Checking for Buy signals! -----", disable_notification=True)
-
-            alerts = self.check_strategy(ticker_list, full_data, timeframes, alerts)
-
-            with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'wb') as handle2:
-                pickle.dump(alerts, handle2)
-                print("saved messages")
-            if self.use_local_config_or_pythonanywhere:
-                with open(self.LOC_STRING + "messages.txt", "w",encoding='utf-8') as text_file:
-                    text_file.write(message_reader(alerts))
-                print("messages saved in file...")
-            else:
-                self.put_messages_to_pythonanywhere(alerts)
-            # except:
-            #    print("Error, trying again in 15 min")
-            # cont = False
-
-        # except:
-        #    print("Error occured... retrying")
-        return None
-
-    def get_config_from_pythonanywhere(self):
-        username = self.PA_USERNAME
-        api_token = self.PA_API_TOKEN
-        pythonanywhere_host = "www.pythonanywhere.com"
-        api_base = "https://{pythonanywhere_host}/api/v0/user/{username}/".format(
-            pythonanywhere_host=pythonanywhere_host,
-            username=username,
-        )
-        resp = requests.get(
-            urljoin(api_base, "files/path/home/penzl/mysite/config.json".format(username=username)),
-            headers={"Authorization": "Token {api_token}".format(api_token=api_token)}
-        )
-        return json.loads(resp.content.decode('utf-8'))
-
-    def put_messages_to_pythonanywhere(self, alrt):
-        username = self.PA_USERNAME
-        api_token = self.PA_API_TOKEN
-        pythonanywhere_host = "www.pythonanywhere.com"
-        api_base = "https://{pythonanywhere_host}/api/v0/user/{username}/".format(
-            pythonanywhere_host=pythonanywhere_host,
-            username=username,
-        )
-        resp = requests.post(
-            urljoin(api_base, "files/path/home/penzl/mysite/messages.txt".format(username=username)),
-            files={"content": message_reader(alrt) + "\n\n" + message_reader_combine_alerts(alrt)},
-            headers={"Authorization": "Token {api_token}".format(api_token=api_token)}
-        )
-        if resp.status_code == 200 or resp.status_code == 201:
-            print("Messages posted on Pythonanywhere server...")
-        else:
-            print("ERROR: Messages NOT posted on Pythonanywhere server...")
-        return None
+        with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'wb') as handle2:
+            pickle.dump(alerts, handle2)
+            logging.info("\t\to Saved Alerts to pickle: "
+                         "%s" % (self.LOC_STRING + "messages_" + self.LABEL + ".pickle"))
+        with open(self.LOC_STRING + "messages_" + self.LABEL + ".txt", "w", encoding='utf-8') as text_file:
+            text_file.write(message_reader(alerts))
+            logging.info("\t\to Saved Alerts to pickle: "
+                         "%s" % (self.LOC_STRING + "messages_" + self.LABEL + ".txt"))
+        return True
 
     def start_telegram_bot(self):
-        def handle_bot(msg):
+        def handle_bot(msg):  #TODO: check all the commands!
             content_type, chat_type, chat_id = telepot.glance(msg)
-            print(content_type, chat_type)
+            logging.info("! TELEGRAM BOT ! : Responding to a text in telegram chat...")
+            #logging.info(str(chat_type))
+            # print(content_type, chat_type)
             if content_type == 'text':
                 # bot.sendMessage(chat_id, msg['text'])
                 if msg['text'] == "/sendpics":
@@ -321,7 +224,7 @@ class BotStarter:
                 if msg['text'] == "/alive":
                     self.bot.sendMessage(chat_id, "... and kicking!")
                 if msg['text'] == "/alerts":
-                    self.bot.sendMessage(chat_id, "http://penzl.pythonanywhere.com/\nActive alerts:")
+                    self.bot.sendMessage(chat_id, "Active alerts:")
                     with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'rb') as handle:
                         alerts_bot = pickle.load(handle)
                     if len(alerts_bot) == 0:
@@ -330,7 +233,7 @@ class BotStarter:
                         self.bot.sendMessage(chat_id, message_reader(alerts_bot))
                         self.bot.sendMessage(chat_id, message_reader_combine_alerts(alerts_bot))
                 if msg['text'] == "/longalerts":
-                    self.bot.sendMessage(chat_id, "http://penzl.pythonanywhere.com/\nActive alerts:")
+                    self.bot.sendMessage(chat_id, "Active alerts:")
                     with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'rb') as handle:
                         alerts_bot = pickle.load(handle)
                     if len(alerts_bot) == 0:
@@ -339,13 +242,16 @@ class BotStarter:
                         self.bot.sendMessage(chat_id, message_reader(alerts_bot, Long=True))
                         self.bot.sendMessage(chat_id, message_reader_combine_alerts(alerts_bot))
                 if msg['text'] == "/showpairs":
-                    if self.use_local_config_or_pythonanywhere:
-                        with open(self.LOC_STRING + 'config.json', 'r') as f:
-                            config = json.load(f)
-                            # list_USDT = [config[key][0] for key in config.keys()] with tradingview
-                    else:
-                        config = self.get_config_from_pythonanywhere()
+                    with open(self.LOC_STRING + 'config.yml', 'r') as f:
+                        config = yml.load(f)
+                        # list_USDT = [config[key][0] for key in config.keys()] with tradingview
+
                     self.bot.sendMessage(chat_id, "Current " + self.LABEL + " pairlist: " + str(list(config.keys())))
+
+                if msg['text'] == "/senddata":
+                    with open(self.LOC_STRING + "output_" + self.LABEL + ".json") as f:
+                        lines = f.read()
+                    self.bot.sendMessage(chat_id, lines)
 
                 if msg['text'] == "/help":
                     str0 = "Strategies: \n" \
@@ -360,6 +266,7 @@ class BotStarter:
                            "\n\t /alive - Check if bot is alive \n\t /alerts -Show all current active alerts" \
                            "\n\t /longalerts -Show all current active alerts - long version" \
                            "\n\t /showpairs - shows current pairlist" \
+                           "\n\t /senddata - Sends the current dataframe of analysis" \
                            "\n\t /removemessages - remove old messages, start from scratch" \
                            "\n\t /help - This message"
                     self.bot.sendMessage(chat_id, str0)
@@ -367,300 +274,178 @@ class BotStarter:
                     self.bot.sendMessage(chat_id, "Removing all old messages (" + self.LABEL + ")!")
                     with open(self.LOC_STRING + "messages_" + self.LABEL + ".pickle", 'wb') as handle2:
                         pickle.dump([], handle2)
-                        print("saved empty messages")
+                        logging.info("saved empty messages")
 
         MessageLoop(self.bot, handle_bot).run_as_thread()
-        print('Bot is listening for /sendpics and /alive and /alerts...')
+        logging.info("\t- Telegram bot started! (Send /help in the app to get more info!)")
 
-    def alert_creator(self, condition, value, kline_size, strategy_label, str_label, previous_messages,
+    def send_message(self, text):
+        self.bot.sendMessage(self.chat_id, text)
+
+    def alert_creator(self, condition, value, strategy_label, str_label, previous_messages,
                       messages, alert=True):
 
-        msg = [value, kline_size, strategy_label, str_label,
-               datetime.now()
-               ]
+        msg_dict = {
+            "ticker": value,
+            "label": strategy_label,
+            "string": str_label,
+            "time": datetime.now()
+        }
         if condition:
-            if msg[:3] not in [part[:3] for part in previous_messages]:
+            if [msg_dict["ticker"], msg_dict["label"]] not \
+                    in [[part["ticker"], part["label"]] for part in previous_messages]:
+                # if msg[:3] not in [part[:3] for part in previous_messages]:
+                print()
                 if alert:
                     self.bot.sendMessage(self.chat_id,
                                          emoji.emojize(':heavy_exclamation_mark:', use_aliases=True) +
                                          value.replace("-USD", "").replace("1", "") + ": " + str_label,
                                          disable_notification=False)
-                    print("NEW Message: " + str(msg))
+                    logging.info("\t\t\t\t\t-> Sending Alert! ")
+                    logging.debug("\t\t\t\t\tMessage: " + str(msg_dict))
+                    # print("NEW Message: " + str(msg))
             else:
-                indx = [part[:3] for part in previous_messages].index(msg[:3])
-                msg[4] = previous_messages[indx][4]
-                print("Still Active Message: " + str(msg))
+                indx = [[part["ticker"], part["label"]] for part in
+                        previous_messages].index([msg_dict["ticker"], msg_dict["label"]])
+                msg_dict["time"] = previous_messages[indx]["time"]
+                if alert:
+                    logging.info("\t\t\t\t\t-> Alert already active... ")
+                logging.debug("\t\t\t\t\tMessage: " + str(msg_dict))
 
-            messages.append(msg)
+            messages.append(msg_dict)
 
-        elif msg[:3] in [part[:3] for part in previous_messages]:
-            indx = [part[:3] for part in previous_messages].index(msg[:3])
-            timestamp = previous_messages[indx][4]
+        elif [msg_dict["ticker"], msg_dict["label"]] \
+                in [[part["ticker"], part["label"]] for part in previous_messages]:
+            indx = [[part["ticker"], part["label"]] for part in
+                    previous_messages].index([msg_dict["ticker"], msg_dict["label"]])
+            timestamp = previous_messages[indx]["time"]
             if (datetime.now() - timestamp).total_seconds() / 60 < 60 * 8:
-                print("Appending old message: " + str(previous_messages[indx]))
-                messages.append([value, kline_size, strategy_label, str_label + " (Not Active)", timestamp])
+                logging.info("Appending old message: " + str(previous_messages[indx]))
+                msg_dict["string"] = msg_dict["string"] + " (Not Active)"
+                msg_dict["time"] = timestamp
+                messages.append(msg_dict)
         return messages
 
-    def check_strategy(self, symbol_list, dataframe, timeframes, previous_messages):
+    def check_strategy(self, config, output_data, previous_messages):
         messages = []
-        f_form_sh = "{:.5g}".format
-        if self.use_local_config_or_pythonanywhere:
-            with open(self.LOC_STRING + 'config.json', 'r') as f:
-                config = json.load(f)
-                # list_USDT = [config[key][0] for key in config.keys()] with tradingview
-        else:
-            config = self.get_config_from_pythonanywhere()
-        config_list = list(config)
+        ta_list_global = config["SETTINGS"]["ta_list_global"]
 
-        # for count, [value,_,_] in enumerate(symbol_list): for trading view
-        # symbol_sh = [symbol_list[i].replace("-USD", "").replace("-EUR", "").replace("1", "") for i in range(len(values))]
-        for count, value in enumerate(symbol_list):
+        for count, value in enumerate(config["TICKERS"].keys()):
+            dta = output_data[value]
+            logging.info("\t\t\t* %s:" % value)
             if 1:
-                d_change, w_change, price = dataframe["1d_ch"][count], dataframe["1W_ch"][count], f_form_sh(
-                    float(dataframe["close"][count]))
-                if float(d_change.strip("%")) > 0:
-                    d_change = d_change + emoji.emojize(':evergreen_tree:', use_aliases=True)
-                else:
-                    d_change = d_change + emoji.emojize(':red_triangle_pointed_down:', use_aliases=True)
-                if float(w_change.strip("%")) > 0:
-                    w_change = w_change + emoji.emojize(':evergreen_tree:', use_aliases=True)
-                else:
-                    w_change = w_change + emoji.emojize(':red_triangle_pointed_down:', use_aliases=True)
-                trend_str = "\n  " + emoji.emojize(':bear:', use_aliases=True) + \
-                            "BEAR EMA trend" if (float(dataframe["1d_EMA31"][count]) -
-                                             float(dataframe["1d_EMA59"][count])) < 0 else \
-                    "\n  " + emoji.emojize(':cow_face:', use_aliases=True) + \
-                    " BULL EMA trend"
-                str_label = price + ", " + d_change + " (week: " + w_change + ")" + trend_str
-                messages = self.alert_creator(True, value, "None",
-                                              "pct_changes", str_label, previous_messages, messages,
-                                              alert=False)
-                for kline_size in timeframes:
-                    '''
-                    Strategy 1
-                    '''
-                    # str_label = "BullBuy: " + value + ", " + kline_size + ", Price: " + dataframe["close"][count] \
-                    #             + ", HCH: " + dataframe[kline_size + "_hist_ch"][count] \
-                    #             + ", RSI = " + dataframe[kline_size + "_rsi"][count]
-                    # strategy_label = "hist_ch>0 & rsi < 40"
-                    #
-                    # condition = float(dataframe[kline_size + "_hist_ch"][count].strip("%")) >= 0 and float(
-                    #     dataframe[kline_size + "_rsi"][count]) <= 40
-                    #
-                    # messages = alert_creator(bot, chat_id, condition, value, kline_size,
-                    #                          strategy_label, str_label, previous_messages, messages)
-
-                    '''
-                    Strategy 2
-                    '''
-                    str_label = "Selloff," + kline_size + " Price: " \
-                                + dataframe["close"][count] + ", RSI = " + dataframe[kline_size + "_rsi"][count]
-                    strategy_label = "rsi < 30"
-
-                    condition = float(dataframe[kline_size + "_rsi"][count]) <= 30
-                    messages = self.alert_creator(condition, value, kline_size,
-                                                  strategy_label, str_label, previous_messages, messages)
-
-                    '''
-                    Sell Strategy 1
-                    '''
-                    str_label = "Cash-out SELL alert " + emoji.emojize(':money_bag:', use_aliases=True) + "," + \
-                                kline_size + " Price: " \
-                                + dataframe["close"][count] + ", RSI = " + dataframe[kline_size + "_rsi"][count]
-                    strategy_label = "rsi > 70"
-
-                    condition = float(dataframe[kline_size + "_rsi"][count]) >= 75
-
-                    messages = self.alert_creator(condition, value, kline_size,
-                                                  strategy_label, str_label, previous_messages, messages)
-
-                '''
-                Strategy 3 -- not checked for all kline_size
-                If weekly RSI > 50:
-                        if daily RSI <50 and histogram change positive:
-                            BUY ALERT
-                '''
-                str_label = "BullDCA," + " Price: " + dataframe["close"][count] \
-                            + ", 1w_RSI = " + dataframe["1W_rsi"][count] \
-                            + ", 1d_RSI = " + dataframe["1d_rsi"][count] \
-                            + ", 1d_Stoch.K: " + dataframe["1d_Stoch.K"][count] \
-                            + ", 1d_Stoch.D: " + dataframe["1d_Stoch.D"][count]
-
-                strategy_label = "1w_rsi > 50 & 1d_rsi < 50 & 1d_hist_ch>0"
-                condition = float(dataframe["1W_rsi"][count]) >= 50 \
-                            and float(dataframe["1d_rsi"][count]) <= 50 \
-                            and float(dataframe["1d_Stoch.K"][count]) - float(dataframe["1d_Stoch.D"][count]) >= 0
-
-                messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, str_label, previous_messages, messages)
-
-                '''
-                Strategy 4 -- not checked for all kline_size
-                If weekly RSI < 50:
-                        if daily RSI <30 and histogram change positive:
-                            BUY ALERT
-                '''
-                str_label = "BearDCA," + " Price: " + dataframe["close"][count] \
-                            + ", 1w_RSI = " + dataframe["1W_rsi"][count] \
-                            + ", 1d_RSI = " + dataframe["1d_rsi"][count] \
-                            + ", 1d_Stoch.K: " + dataframe["1d_Stoch.K"][count] \
-                            + ", 1d_Stoch.D: " + dataframe["1d_Stoch.D"][count]
-
-                strategy_label = "1w_rsi < 50 & 1d_rsi < 30 & 1d_hist_ch>0"
-
-                condition = float(dataframe["1W_rsi"][count]) <= 50 \
-                            and float(dataframe["1d_rsi"][count]) <= 30 \
-                            and float(dataframe["1d_Stoch.K"][count]) - \
-                            float(dataframe["1d_Stoch.D"][count]) >= 0
-
-                messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, str_label, previous_messages, messages)
-                '''
-                Sell Strategy 2 -- not checked for all kline_size
-                If weekly RSI > 70:
-                        if daily RSI <30:
-                            SELL ALERT
-                '''
-                # str_label = "SELL DCA " + emoji.emojize(':money_bag:', use_aliases=True) + ":"\
-                #             + value + ", Price: " + dataframe["close"][count] \
-                #             + ", 1w_RSI = " + dataframe["1W_rsi"][count] \
-                #             + ", 1d_RSI = " + dataframe["1d_rsi"][count] \
-                #             + ", 1d_Stoch.K: " + dataframe["1d_Stoch.K"][count] \
-                #             + ", 1d_Stoch.D: " + dataframe["1d_Stoch_D"][count]
-                # strategy_label = "1w_rsi < 50 & 1d_rsi < 30 & 1d_hist_ch>0"
-                #
-                # condition = float(dataframe["1W_rsi"][count]) >= 70 \
-                #             and float(dataframe["1d_rsi"][count]) >= 65
-                #
-                # messages = alert_creator(bot, chat_id, condition, value, "1d",
-                #                          strategy_label, str_label, previous_messages, messages,
-                #                                          dataframe["1d_ch"][count],dataframe["1W_ch"][count])
-
-                '''
-                Check Trendlines [2% close]
-                '''
-                trend_list = config[config_list[count]][1:]
-                for trend in trend_list:
-                    if trend[1] == "Exp":
-                        x1, y1 = pd.Timestamp(trend[2]).value, np.log(trend[3])
-                        x2, y2 = pd.Timestamp(trend[4]).value, np.log(trend[5])
-                    else:
-                        x1, y1 = pd.Timestamp(trend[2]).value, trend[3]
-                        x2, y2 = pd.Timestamp(trend[4]).value, trend[5]
-                    m = (y2 - y1) / (x2 - x1)
-                    if trend[1] == "Exp":
-                        res = np.exp(m * (pd.Timestamp.now().value - x1) + y1)
-                    else:
-                        res = m * (pd.Timestamp.now().value - x1) + y1
-
-                    str_label = "Closing to (<2%) " + trend[0] + emoji.emojize(':chart_with_upwards_trend:',
-                                                                               use_aliases=True) + "," \
-                                + " Price: " + f_form_sh(float(dataframe["close"][count])) + \
-                                ", Trend Price: " + "{:.3g}".format(res)
-                    strategy_label = "close_to_" + trend[0]
-                    condition = np.abs(
-                        (float(dataframe["close"][count]) - res) / float(dataframe["close"][count])) <= 0.02
-                    messages = self.alert_creator(condition, value, "1d",
-                                                  strategy_label, str_label, previous_messages, messages)
-                '''
-                Check Trendlines [Crossing]
-                '''
-                trend_list = config[config_list[count]][1:]
-                for trend in trend_list:
-                    if trend[1] == "Exp":
-                        x1, y1 = pd.Timestamp(trend[2]).value, np.log(trend[3])
-                        x2, y2 = pd.Timestamp(trend[4]).value, np.log(trend[5])
-                    else:
-                        x1, y1 = pd.Timestamp(trend[2]).value, trend[3]
-                        x2, y2 = pd.Timestamp(trend[4]).value, trend[5]
-                    m = (y2 - y1) / (x2 - x1)
-                    if trend[1] == "Exp":
-                        res = np.exp(m * (pd.Timestamp.now().value - x1) + y1)
-                    else:
-                        res = m * (pd.Timestamp.now().value - x1) + y1
-
-                    str_label = "Crossed -> " + trend[0] + emoji.emojize(':chart_with_upwards_trend:',
-                                                                         use_aliases=True) + "," \
-                                + " Price: " + f_form_sh(float(dataframe["close"][count])) + \
-                                ", Trend Price: " + "{:.3g}".format(res)
-                    strategy_label = "crossed_" + trend[0]
-                    if trend[7] == "Alert_Below":
-                        condition = float(dataframe["close"][count]) <= res
-                    if trend[7] == "Alert_Above":
-                        condition = float(dataframe["close"][count]) >= res
-                    messages = self.alert_creator(condition, value, "1d",
-                                                  strategy_label, str_label, previous_messages, messages)
-                '''
-                Check MA21 Envelope [Crossing]
-                '''
-                str_label = "In Accum. Zone," + " Price: " + f_form_sh(float(dataframe["close"][count])) + \
-                            " is between " + f_form_sh(float(dataframe["1W_MA21"][count]) / 2) + " and " + \
-                            f_form_sh(float(dataframe["1W_MA21"][count]) / 1.5) + " (or below)"
-                strategy_label = "in_accum_zone"
-
-                condition = float(dataframe["1W_MA21"][count]) / 1.5 >= float(dataframe["close"][count])
-
-                messages = self.alert_creator(condition, value, "1W",
-                                              strategy_label, str_label, previous_messages, messages)
-                '''
-                Check MA21 Envelope [Crossing]
-                '''
-                str_label = "In Reduc. Zone," + " Price: " + f_form_sh(float(dataframe["close"][count])) + \
-                            " is between " + f_form_sh(float(dataframe["1W_MA21"][count]) * 1.5) + " and " + \
-                            f_form_sh(float(dataframe["1W_MA21"][count]) * 2) + " (or above)"
-                strategy_label = "in_reduc_zone"
-
-                condition = float(dataframe["1W_MA21"][count]) * 1.5 <= float(dataframe["close"][count])
-
-                messages = self.alert_creator(condition, value, "1W",
-                                              strategy_label, str_label, previous_messages, messages)
-                '''
-                Check MA21 Envelope [2% Close]
-                '''
-                # str_label = "Close to 21W SMA (<2%): " + value + ", Price: " + f_form_sh(float(dataframe["close"][count])) + \
-                #             ", 21W SMA: " + f_form_sh(float(dataframe["1W_MA21"][count])/2)
-                # strategy_label = "close_2_21MA"
-                #
-                # condition = np.abs((float(dataframe["close"][count]) - float(dataframe["1W_MA21"][count])) / float(dataframe["close"][count])) <= 0.02
-                #
-                # messages = alert_creator(bot, chat_id, condition, value, "1W",
-                #                          strategy_label, str_label, previous_messages, messages)
-                '''
-                BollingerBands
-                '''
-                str_label = "Out Of Bollinger Bands, " + " Price: " \
-                            + dataframe["close"][count] + ", BB_l = " + dataframe["1d_BBl"][count] + \
-                            ", BB_h = " + dataframe["1d_BBh"][count]
-                strategy_label = "out_of_BB"
-
-                condition = float(dataframe["1d_BBl"][count]) >= float(dataframe["close"][count]) or \
-                            float(dataframe["1d_BBh"][count]) <= float(dataframe["close"][count])
-                messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, str_label, previous_messages, messages, alert=False)
-                '''
-                EMA trend switch
-                '''
-                str_label = "EMA trend in grey zone: " + value + ", " + ", Price: " \
-                            + dataframe["close"][count] + ", EMA31 = " + dataframe["1d_EMA31"][count] + \
-                            ", EMA59 = " + dataframe["1d_EMA59"][count]
-                strategy_label = "EMA_trend_grey"
-                condition = 2 * np.abs(
-                    (float(dataframe["1d_EMA31"][count]) - float(dataframe["1d_EMA59"][count]))
-                    / (float(dataframe["1d_EMA31"][count]) + float(dataframe["1d_EMA59"][count]))) < 0.01
-                messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, str_label, previous_messages, messages)
-
-                '''
-                EMA trend positive/negative
-                '''
-                strategy_label = 'EMA_trend_negative' if (float(dataframe["1d_EMA31"][count]) -
-                                                          float(dataframe["1d_EMA59"][
-                                                                    count])) < 0 else 'EMA_trend_positive'
-                condition = True
-                messages = self.alert_creator(condition, value, "1d",
-                                              strategy_label, trend_str, previous_messages, messages, alert=False)
-
-            # except:
-            #    print("Couldnt check strategy for " + value)
-        # print(messages)
+                logging.debug("\t\t\t\tAdding Daily and Weekly Changes for %s" % value)
+                try:
+                    reports = SHOW_CHANGE(dta)
+                    for report in reports:
+                        logging.debug(
+                            "\t\t\t\t-%s - Condition: %s" % (report["strategy_label"], str(report["condition"])))
+                        messages = self.alert_creator(report["condition"], value,
+                                                      report["strategy_label"],
+                                                      report["str_label"],
+                                                      previous_messages,
+                                                      messages,
+                                                      alert=report["alert"])
+                except Exception as e:
+                    logging.error("Error with Daily and Weekly Changes  --->  %s " % e)
+                ta_list = config["TICKERS"][value]["ta_list"]
+                for TA in ta_list_global + list(set(ta_list) - set(ta_list_global)):
+                    logging.debug("\t\t\t * Checking strategy '%s' for '%s'" % (TA, value))
+                    try:
+                        reports = getattr(strategies, TA)(dta)
+                        for report in reports:
+                            logging.info(
+                                "\t\t\t\t-%s - Condition: %s" % (report["strategy_label"], str(report["condition"])))
+                            messages = self.alert_creator(report["condition"], value,
+                                                          report["strategy_label"],
+                                                          report["str_label"],
+                                                          previous_messages,
+                                                          messages,
+                                                          alert=report["alert"])
+                    except Exception as e:
+                        logging.error(" Error with Strategy '%s'  --->  %s " % (TA, e))
+                trends = config["TICKERS"][value]["trends"]
+                if trends is not None:
+                    for trend in list(trends.keys()):
+                        logging.debug("\t\t\t * Checking trend '%s' for '%s'" % (trend, value))
+                        reports = TrendChecker(trend, trends[trend], dta, value)
+                        for report in reports:
+                            logging.info(
+                                "\t\t\t\t-%s - Condition: %s" % (report["strategy_label"], str(report["condition"])))
+                            messages = self.alert_creator(report["condition"], value,
+                                                          report["strategy_label"],
+                                                          report["str_label"],
+                                                          previous_messages,
+                                                          messages,
+                                                          alert=report["alert"])
         return messages
+
+
+def TrendChecker(trend_name, settings, data, ticker):
+    try:
+        if settings["kind"] == "Exp":
+            x1, y1 = pd.Timestamp(settings['coordinate1'][0]).value, np.log(settings['coordinate1'][1])
+            x2, y2 = pd.Timestamp(settings['coordinate2'][0]).value, np.log(settings['coordinate2'][1])
+            m = (y2 - y1) / (x2 - x1)
+            res = np.exp(m * (pd.Timestamp.now().value - x1) + y1)
+        elif settings["kind"] == "Lin":
+            x1, y1 = pd.Timestamp(settings['coordinate1'][0]).value, settings['coordinate1'][1]
+            x2, y2 = pd.Timestamp(settings['coordinate2'][0]).value, settings['coordinate2'][1]
+            m = (y2 - y1) / (x2 - x1)
+            res = m * (pd.Timestamp.now().value - x1) + y1
+        else:
+            logging.error("Trend kind is not Exp or Lin")
+            return []
+        report = [
+            {
+                "str_label": "Closing to (<2%%), %s" % trend_name +
+                             emoji.emojize(':chart_with_upwards_trend:', use_aliases=True)
+                             + ", Price: %.5g, Trend Price: %.5g" % (data["Close"], res),
+                "strategy_label": "Closing to %s" % trend_name,  # TODO: DO I NEED THIS?
+                "condition": np.abs((data["Close"] - res) / data["Close"]) <= 0.02,
+                "alert": True
+            },
+            {
+                "str_label": "Crossed -> %s" % trend_name +
+                             emoji.emojize(':chart_with_upwards_trend:', use_aliases=True)
+                             + ", Price: %.5g, Trend Price: %.5g" % (data["Close"], res),
+                "strategy_label": "Crossed below %s" % trend_name if settings["alert_condition"] == "Alert_Below"
+                else "Crossed above %s" % trend_name,  # TODO: DO I NEED THIS?
+                "condition": data["Close"] <= res if settings["alert_condition"] == "Alert_Below"
+                else data["Close"] >= res,
+                "alert": True
+            },
+        ]
+        return report
+    except Exception as e:
+        logging.error("Some issue with the trend %s for ticker %s" % (trend_name, ticker))
+        logging.error(e)
+        return []
+
+
+def SHOW_CHANGE(data=None):
+    d_change = "%.1f%%" % data["CHANGE1d_day"] + emoji.emojize(':evergreen_tree:', use_aliases=True) \
+        if data["CHANGE1d_day"] >= 0.0 \
+        else "%.1f%%" % data["CHANGE1d_day"] + emoji.emojize(':red_triangle_pointed_down:', use_aliases=True)
+    w_change = "%.1f%%" % data["CHANGE7d_day"] + emoji.emojize(':evergreen_tree:', use_aliases=True) \
+        if data["CHANGE7d_day"] >= 0.0 \
+        else "%.1f%%" % data["CHANGE7d_day"] + emoji.emojize(':red_triangle_pointed_down:', use_aliases=True)
+    report = [
+        {
+            "str_label": "%.5g" % data["Close"] + ", " + d_change + " (week: " + w_change + ")",
+            "strategy_label": "show_change",  # TODO: DO I NEED THIS?
+            "condition": True,
+            "alert": False
+        }
+    ]
+    return report
+
+
+def CHANGE1d(dta, timeframe):
+    dta["CHANGE1d" + timeframe] = 100 * round((dta['Close'][-1] - dta['Close'][-2]) / dta['Close'][-2], 5)
+    return dta
+
+
+def CHANGE7d(dta, timeframe):
+    dta["CHANGE7d" + timeframe] = 100 * round((dta['Close'][-1] - dta['Close'][-8]) / dta['Close'][-8], 5)
+    return dta
