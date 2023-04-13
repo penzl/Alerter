@@ -3,7 +3,7 @@ SETTINGS:
   ta_list_global:
     - "OUT_OF_BBANDS"
     - "CASH_OUT_RSI"
-    - "MA21_ENVELOPE"
+    - "MA21_ENVELOPE" 
 TICKERS:
   BTC-USD:
     label: "BTCUSDT"
