@@ -1,7 +1,7 @@
 import logging
 
-from AlerterV1_helpers import *
-from AlerterV1_constants import *
+from AlerterV2_helpers import *
+from AlerterV2_constants import *
 import time
 from datetime import date, timedelta
 
@@ -38,7 +38,7 @@ def run(test=False):
 
         Tomorrow_Date = date.today() + timedelta(days=1)
         fail_count = 0
-        sleep_time = 1  # in minutes
+        sleep_time = 5  # in minutes
         while date.today() < Tomorrow_Date:
             if not BOT.loop_this():
                 fail_count = fail_count + 1
