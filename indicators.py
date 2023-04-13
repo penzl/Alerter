@@ -51,8 +51,3 @@ def EMA31(dta, timeframe):
 def EMA59(dta, timeframe):
     dta["EMA59" + timeframe] = EMAIndicator(close=dta['Close'], window=59).ema_indicator()
     return dta
-
-
-#################################################
-#        Dont change the code below             #
-#################################################

@@ -199,10 +199,3 @@ def BearDCA(data=None, check=False):
             },
         ]
         return report
-
-
-#################################################
-#        Dont change the code below             #
-#################################################
-
-
